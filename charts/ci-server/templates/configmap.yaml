@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-ci-server-env-config
+  namespace: default
+data:
+  DEBUG: "{{ default true .Values.debug }}"

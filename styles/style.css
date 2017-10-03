@@ -1,0 +1,39 @@
+html {
+    background-color: white;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center;
+}
+
+body {
+    background: transparent;
+    padding-top: 15px;
+}
+
+.glyphicon-remove {
+    color: red;
+}
+
+.glyphicon-ok {
+    color: green;
+}
+
+.container > h1 {
+    width: 100%;
+    color: black;
+}
+
+.build-panel {
+    max-height: 400px;
+    overflow: scroll;
+}
+
+.output {
+    font-family: "Courier New", Courier, monospace;
+}
+
+.output-panelbody {
+    height: 400px;
+    max-height: 400px;
+    overflow: scroll;
+}

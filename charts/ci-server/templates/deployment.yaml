@@ -1,0 +1,43 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: ci-server
+  labels:
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
+  annotations:
+    checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+
+spec:
+  replicas: {{ .Values.replicaCount }}
+  minReadySeconds: 2
+  progressDeadlineSeconds: 10
+  template:
+    metadata:
+      labels:
+        service: ci-server
+      annotations:
+        # add random string, to force re-start of pods.
+        random-string: {{ randAlphaNum 15 }}
+    spec:
+      containers:
+      - envFrom:
+        - configMapRef:
+            name: {{ .Release.Name }}-ci-server-env-config
+        image: {{ .Values.image.name }}:{{ .Values.image.tag }}
+        imagePullPolicy: Always
+        name: ci-server
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    service: ci-server
+  name: ci-server
+spec:
+  type: LoadBalancer
+  ports:
+  - name: http
+    port: 8080
+  selector:
+    service: ci-server

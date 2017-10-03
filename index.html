@@ -1,0 +1,52 @@
+<html>
+<head>
+    <link rel="stylesheet"
+          href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+          integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u"
+          crossorigin="anonymous">
+    <link rel="stylesheet"
+          href="styles/style.css">
+    <link rel="stylesheet"
+          href="styles/jasny-bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+            integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa"
+            crossorigin="anonymous"></script>
+    <script src="scripts/moment.min.js"></script>
+    <script src="scripts/jasny-bootstrap.min.js"></script>
+    <script src="scripts/script.js"></script>
+    <script src="scripts/ansi_up.js"></script>
+</head>
+<body>
+<div class="container">
+    <h1>Awesome sauce build dashboard</h1>
+    <div id="overview-content">
+        <div class="row">
+            <div class="col-xs-12 col-sm-4">
+                <div id="result-panel" class="panel">
+                    <div class="panel-heading">
+                        <h4 class="panel-title">
+                            <span id="quick-status" class="glyphicon"></span> Repositories:
+                        </h4>
+                    </div>
+                    <div id="repos-list" class="panel-body"></div>
+                </div>
+            </div>
+            <div class="col-xs-12 col-sm-8">
+                <div id="build-panel" class="build-panel">
+                    <div class="alert alert-info" role="alert">
+                        <strong>Welcome!</strong> Choose a Repository.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="build-steps">
+    </div>
+    <div id="output" class="output">
+    </div>
+</div>
+
+
+</body>
+</html>
