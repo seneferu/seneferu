@@ -2,11 +2,11 @@ Simple Kubernetes based build
 
 Named after the pharo that build 3 pyramids, because he was surely awesome... like this tools
 
-Build in 24 hours in the Tradeshift Hackathon 2017, the code is *utterly crap* and thrown
+Build in 24 hours in the Tradeshift Hackathon 2017, the code is __utterly crap__ and thrown
 together be 4 sleep deprived ponies, but the concept seems to
 be working.
 
-_DO NOT USE IN PRODUCTION_
+__DO NOT USE IN PRODUCTION__ or well that's up to you I guess.
 
 
 Build system that schedules build in a pod in a Kubernetes cluster.
