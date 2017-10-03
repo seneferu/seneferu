@@ -51,3 +51,16 @@ pipeline:
 
 2. Known environment variables
    `GIT_REF` ref to the git hash being build, the head of the branch
+
+
+# Contributers
+
+Soren Mathiasen @sorenmat
+
+Carl-Magnus BjÃ¶rkell @callebjorkell
+ 
+Christian Nilsson @nchrisdk
+ 
+Nicolai Willems @nwillems
+ 
+
