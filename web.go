@@ -101,6 +101,7 @@ func startWebServer(db *storm.DB, kubectl *kubernetes.Clientset, secret string, 
 	e.Static("/scripts", "scripts")
 	e.Static("/images", "images")
 	e.File("/", "index.html")
+	e.File("/v2", "index_new.html")
 	e.GET("/status", handleStatus())
 	e.GET("/repos", handleFetchRepos(db))
 	e.GET("/repo/:id", handleFetchRepoData(db))

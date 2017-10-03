@@ -1,0 +1,61 @@
+
+.pipeline-container {
+    border: 1px solid #ccc;
+    padding: 20px;
+    white-space: nowrap;
+}
+
+.pipeline-container .pipeline {
+    /* list-style: none; */
+    padding:0;
+    letter-spacing: -4px;
+    text-align: left;
+}
+/* .pipeline-container .pipeline > li { letter-spacing  :0px; }
+*/
+
+.pipeline .build-group {
+    display: inline-block;
+    margin-left: 40px;
+    letter-spacing: 0;
+}
+
+.pipeline .build-header {
+    font-size: 1.01em;
+    font-weight: bold;
+    margin: 0 0 10px 20px;
+}
+
+.pipeline .build-group:first-child { margin-left: 0; }
+
+.pipeline .build-group .jobs-container {
+    position: relative;
+    padding: 0px;
+}
+
+.pipeline .jobs-container > li {
+    list-style: none;
+    border: 1px solid #ccc;
+    border-radius: 15px;
+    width: 200px;
+}
+
+.pipeline .jobs-container > li:hover { 
+    background-color: #ccc;
+    border-color: #666;
+}
+
+.pipeline .build-group:not(:first-child) .jobs-container > li:before {
+    content: '';
+    position: absolute;
+    top: 48%;
+    left: -40px;
+    border-top: 2px solid #ccc;
+    width: 40px;
+    height:2px;
+}
+
+.job { margin: 5px 15px; }
+
+.job .glyphicon { margin-right: 5px; }
+
