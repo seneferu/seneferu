@@ -1,6 +1,13 @@
-Simple Kubernetes based CI-Server
+Simple Kubernetes based build
+
+Build in 24 hours in the Tradeshift Hackathon 2017, the code is utterly crap but the concept seems to
+be working.
+
+_DO NOT USE IN PRODUCTION_
+
 
 Build system that schedules build in a pod in a Kubernetes cluster.
+That way we can leverage Kubernetes for scaling and reliability.
 
 Build repositories that contains a .ci.yaml file
 
@@ -19,7 +26,7 @@ pipeline:
 
 # Building and running tests
 
-`go build` create a ci-server binary that can be executed from the commandline
+`go build` create a server binary that can be executed from the commandline
 
 
 
