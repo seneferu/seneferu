@@ -57,7 +57,7 @@ pipeline:
 
 Soren Mathiasen @sorenmat
 
-Carl-Magnus BjÃ¶rkell @callebjorkell
+Carl-Magnus Björkell @callebjorkell
  
 Christian Nilsson @nchrisdk
  
