@@ -2,6 +2,10 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"strconv"
+	"time"
+
 	"github.com/asdine/storm"
 	"github.com/boltdb/bolt"
 	"github.com/labstack/echo"
@@ -10,9 +14,6 @@ import (
 	"gopkg.in/go-playground/webhooks.v3"
 	"gopkg.in/go-playground/webhooks.v3/github"
 	"k8s.io/client-go/kubernetes"
-	"log"
-	"strconv"
-	"time"
 )
 
 /*
@@ -92,10 +93,10 @@ func HandlePush(db *storm.DB, kubectl *kubernetes.Clientset) webhooks.ProcessPay
 
 	}
 }
-func startUI(db *storm.DB, kubectl *kubernetes.Clientset) {
+func startUI(db *storm.DB, kubectl *kubernetes.Clientset, secret string) {
 
 	// Github hook
-	hook := github.New(&github.Config{Secret: "supersecretpassword..nice"})
+	hook := github.New(&github.Config{Secret: secret})
 	hook.RegisterEvents(HandleRelease, github.ReleaseEvent)
 	hook.RegisterEvents(HandlePullRequest, github.PullRequestEvent)
 	hook.RegisterEvents(HandlePush(db, kubectl), github.PushEvent)

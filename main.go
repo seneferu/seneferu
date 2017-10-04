@@ -5,31 +5,39 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
+	"io"
+	"log"
+	"os"
+	"time"
+
 	"github.com/asdine/storm"
 	"github.com/boltdb/bolt"
 	"github.com/cncd/pipeline/pipeline/frontend/yaml"
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 	"gitlab.com/sorenmat/ci-server/github"
-	"io"
 	"k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"log"
-	"os"
-	"time"
 )
 
 var (
-	kubeCfgFile = flag.String("kubeconfig", "", "Kubernetes Config File")
+	kubeCfgFile  = flag.String("kubeconfig", "", "Kubernetes Config File")
+	githubSecret = flag.String("githubsecret", "", "Github secret token, needs to match the one on Github ")
 )
 
 const shareddir = "/share"
 
 func main() {
 	flag.Parse()
+	if *githubSecret == "" {
+		*githubSecret = os.Getenv("githubsecret")
+	}
+	if *githubSecret == "" {
+		log.Fatal("githubsecret can't be empty")
+	}
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		log.Println("Appears we are not running in a cluster")
@@ -55,7 +63,7 @@ func startWeb(config *rest.Config) {
 	if err != nil {
 		panic(err.Error())
 	}
-	startUI(db, kubectl)
+	startUI(db, kubectl, *githubSecret)
 }
 
 // generateScript is a helper function that generates a build script and base64 encode it.
@@ -98,7 +106,6 @@ func createBuildSteps(build *Build, cfg *yaml.Config) ([]v1.Container, error) {
 
 	var containers []v1.Container
 	for _, cont := range cfg.Pipeline.Containers {
-
 
 		var cmds []string
 		projectName := build.Owner + "/" + build.Repo
@@ -237,7 +244,7 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 	}
 
 	// add container to the pod
-	cfg,err := getConfigfile(build)
+	cfg, err := getConfigfile(build)
 	if err != nil {
 		return errors.Wrap(err, "unable to handle buildconfig file")
 	}
