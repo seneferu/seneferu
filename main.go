@@ -23,12 +23,12 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+const shareddir = "/share"
+
 var (
 	kubeCfgFile  = flag.String("kubeconfig", "", "Kubernetes Config File")
 	githubSecret = flag.String("githubsecret", "", "Github secret token, needs to match the one on Github ")
 )
-
-const shareddir = "/share"
 
 func main() {
 	flag.Parse()

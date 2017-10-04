@@ -13,6 +13,11 @@ Build system that schedules build in a pod in a Kubernetes cluster.
 That way we can leverage Kubernetes for scaling and reliability.
 
 
+# Screenshot
+
+![Seneferu main screen](docs/seneferu.png "Main screen")
+
+
 # Building
 
 `go build`
