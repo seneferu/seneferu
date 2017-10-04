@@ -8,13 +8,14 @@ import (
 	"io"
 	"log"
 	"os"
+	"regexp"
 	"time"
 
 	"github.com/asdine/storm"
 	"github.com/boltdb/bolt"
-	"github.com/cncd/pipeline/pipeline/frontend/yaml"
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
+	"github.com/sorenmat/pipeline/pipeline/frontend/yaml"
 	"gitlab.com/sorenmat/ci-server/github"
 	"k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -203,30 +204,30 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 	pod := &v1.Pod{Spec: v1.PodSpec{
 		RestartPolicy: "Never",
 	}}
-	buildname := "build-" + uuid.New()
+	buildUUID := "build-" + uuid.New()
 
-	buildID := -1
+	buildNumber := -1
 	err := repo.db.Bolt.Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists([]byte("builds"))
 		if err != nil {
 			fmt.Println(err)
 		}
 		id, _ := b.NextSequence()
-		buildID = int(id)
+		buildNumber = int(id)
 		return nil
 	})
-	if err != nil || buildID == -1 {
+	if err != nil || buildNumber == -1 {
 		return errors.Wrap(err, "unable to auto increment build number")
 	}
-	build.Number = buildID
+	build.Number = buildNumber
 
 	err = repo.Save(build)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("unable to save build %v", build))
 	}
 
-	fmt.Println("Scheduling build: ", buildname)
-	pod.ObjectMeta.Name = buildname
+	fmt.Println("Scheduling build: ", buildUUID)
+	pod.ObjectMeta.Name = buildUUID
 	vol1 := v1.Volume{}
 	vol1.Name = "shared-data"
 	vol1.EmptyDir = &v1.EmptyDirVolumeSource{}
@@ -268,7 +269,7 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 
 	// replace above sleep with a polling of the container ready state
 	// perhaps replace with a listen hook
-	waitForContainer(kubectl, buildname)
+	waitForContainer(kubectl, buildUUID)
 	build.Status = "Running"
 	err = repo.Save(build)
 	if err != nil {
@@ -279,7 +280,7 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 		build.Steps = append(build.Steps, step)
 		repo.Save(build)
 		bw := &BucketWriter{build: build, repo: repo, Step: cc.Name}
-		err = getLog(kubectl, buildname, cc.Name, bw)
+		err = saveLog(kubectl, buildUUID, cc.Name, bw)
 		if err != nil {
 			log.Println("Error while getting log ", err)
 		}
@@ -288,8 +289,29 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 		repo.Save(build)
 	}
 
-	build.Success = true
+	status, err := isContainerDone(kubectl, buildUUID)
+	if err != nil {
+		build.Success = status
+		repo.Save(build)
+		return errors.Wrap(err, "unable to wait for container to complete")
+	}
+	build.Success = status
 	repo.Save(build)
+
+	// Fetch coverage configuration from settings
+	var testCoverage string
+	for _, c := range cfg.Pipeline.Containers {
+		if c.Coverage != "" {
+			testCoverage = c.Coverage
+			break
+		}
+	}
+
+	// Add coverage to build
+	coverage := getCoverageFromLogs(repo, buildNumber, testCoverage)
+	build.Coverage = coverage
+	repo.Save(build)
+
 	/*
 		// clean up
 		err = kubectl.Pods("default").Delete(buildname, &meta_v1.DeleteOptions{})
@@ -299,6 +321,24 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 		fmt.Println("Pod deleted!")
 	*/
 	return nil
+}
+func getCoverageFromLogs(repo *Repo, buildNumber int, testCoverage string) string {
+	// Search for the coverage regex in the logs, and add it to the build if found
+	for _, b := range repo.Build {
+		if b.Number == buildNumber {
+			for _, s := range b.Steps {
+				r, err := regexp.Compile(testCoverage)
+				if err != nil {
+					log.Println(err)
+					return ""
+				}
+				if result := r.FindString(s.Log); result != "" {
+					return result
+				}
+			}
+		}
+	}
+	return ""
 }
 
 func waitForContainer(kubectl *kubernetes.Clientset, buildname string) error {
@@ -317,8 +357,28 @@ func waitForContainer(kubectl *kubernetes.Clientset, buildname string) error {
 	}
 }
 
-// getLog get the build of container in a running pod
-func getLog(clientset *kubernetes.Clientset, pod string, container string, bw *BucketWriter) error {
+func isContainerDone(kubectl *kubernetes.Clientset, buildname string) (bool, error) {
+	count := 0
+	for {
+		pod, err := kubectl.CoreV1().Pods("default").Get(buildname, meta_v1.GetOptions{})
+		if err != nil {
+			return false, errors.Wrap(err, "unable to get pod, while waiting for it")
+		}
+		if pod.Status.Phase == "Succeeded" {
+			return true, nil
+
+		}
+		if pod.Status.Phase == "Failed" {
+			return false, nil
+		}
+		fmt.Println(pod.Status.Reason)
+		count++
+		time.Sleep(2 * time.Second)
+	}
+}
+
+// saveLog get the build of container in a running pod
+func saveLog(clientset *kubernetes.Clientset, pod string, container string, bw *BucketWriter) error {
 	fmt.Printf("Trying to get log for %v %v\n", pod, container)
 	req := clientset.CoreV1().Pods("default").GetLogs(pod, &v1.PodLogOptions{
 		Container: container,

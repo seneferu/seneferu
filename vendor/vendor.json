@@ -370,6 +370,12 @@
 			"revisionTime": "2017-09-10T13:46:14Z"
 		},
 		{
+			"checksumSHA1": "SFtxjjmcMpib3z+AnePvwZobeyA=",
+			"path": "github.com/sorenmat/pipeline/pipeline/frontend/yaml",
+			"revision": "91a711c3761d953d439ac210b1001b315a319576",
+			"revisionTime": "2017-10-02T06:34:05Z"
+		},
+		{
 			"checksumSHA1": "5KvHyB1CImtwZT3fwNkNUlc8R0k=",
 			"origin": "k8s.io/apimachinery/vendor/github.com/spf13/pflag",
 			"path": "github.com/spf13/pflag",
