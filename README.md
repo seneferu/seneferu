@@ -34,7 +34,7 @@ The build will be executed in the same Kubernetes cluster as the build server is
 Usage of ./seneferu:
   -alsologtostderr
     	log to standard error as well as files
-  -github_token string
+  -githubsecret string
     	Github secret token, needs to match the one on Github
   -kubeconfig string
     	Kubernetes Config File
@@ -50,6 +50,7 @@ Usage of ./seneferu:
     	log level for V logs
   -vmodule value
     	comma-separated list of pattern=N settings for file-filtered logging
+
 ```
 
 Build repositories that contains a .ci.yaml file
@@ -88,6 +89,22 @@ pipeline:
       - echo ${NAME}
 
 ```
+
+2. How do I get test coverage for my build
+```yaml
+pipeline:
+  build:
+    group: build
+    image: golang:latest
+    coverage: coverage: (\d+?.?\d+\%)
+    environment:
+        - NAME=testing
+    commands:
+      - echo ${NAME}
+
+```
+
+
 
 2. Known environment variables
    `GIT_REF` ref to the git hash being build, the head of the branch

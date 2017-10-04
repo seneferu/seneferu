@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/cncd/pipeline/pipeline/frontend/yaml"
+	"github.com/sorenmat/pipeline/pipeline/frontend/yaml"
 	"strings"
 	"testing"
 )
@@ -53,4 +53,23 @@ func TestCreateBuild(t *testing.T) {
 	if !found {
 		t.Error("should have found environment variable in container")
 	}
+}
+
+func TestCoverage(t *testing.T) {
+	str := `coverage: (\d+?.?\d+\%)`
+
+	container := &yaml.Container{Environment: map[string]string{"Name": "sorenmat"}, Coverage: str}
+	cfg := &yaml.Config{}
+	cfg.Pipeline.Containers = append(cfg.Pipeline.Containers, container)
+
+	repo := &Repo{}
+	repo.Build = []*Build{{
+		Number: 1,
+		Steps:  []*Step{{Log: "Build worked\ncoverage: 40%"}},
+	}}
+	coverageResult := getCoverageFromLogs(repo, 1, str)
+	if coverageResult == "" {
+		t.Error("not able to get coverageResult ")
+	}
+	fmt.Print(coverageResult)
 }

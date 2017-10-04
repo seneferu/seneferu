@@ -15,6 +15,7 @@ type Build struct {
 	Repo       string    `json:"repository"`
 	Owner      string    `json:"owner"`
 	Commit     string    `json:"commit"`
+	Coverage   string    `json:"coverage"`
 }
 
 type Step struct {
