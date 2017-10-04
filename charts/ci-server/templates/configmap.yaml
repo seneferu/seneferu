@@ -5,3 +5,4 @@ metadata:
   namespace: default
 data:
   DEBUG: "{{ default true .Values.debug }}"
+  githubsecret: "{{  .Values.githubsecret }}"
