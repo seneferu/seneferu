@@ -12,7 +12,6 @@ __DO NOT USE IN PRODUCTION__ or well that's up to you I guess.
 Build system that schedules build in a pod in a Kubernetes cluster.
 That way we can leverage Kubernetes for scaling and reliability.
 
-
 # Screenshot
 
 ![Seneferu main screen](docs/seneferu.png "Main screen")
