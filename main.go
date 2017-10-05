@@ -324,9 +324,21 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 	// wait for all the build steps to finish
 	fmt.Println("Waiting for build steps...")
 	for _, b := range buildSteps {
-		waitForContainerTermintaion(kubectl, b, buildUUID)
-
+		waitForContainerTermination(kubectl, b, buildUUID)
 	}
+
+	for _, b := range buildSteps {
+		for _, step := range build.Steps {
+			if step.Name == b.Name {
+				exitCode, _ := getExitCode(kubectl, b, buildUUID)
+				if exitCode > 0 {
+					step.Status = "Failed"
+				}
+				step.ExitCode = exitCode
+			}
+		}
+	}
+
 	fmt.Println("All build steps done...")
 
 	// TODO fix this
@@ -362,7 +374,7 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 	return nil
 }
 
-func waitForContainerTermintaion(kubectl *kubernetes.Clientset, b v1.Container, buildUUID string) error {
+func waitForContainerTermination(kubectl *kubernetes.Clientset, b v1.Container, buildUUID string) error {
 	for {
 		pod, err := kubectl.CoreV1().Pods("default").Get(buildUUID, meta_v1.GetOptions{})
 		if err != nil {
@@ -380,6 +392,23 @@ func waitForContainerTermintaion(kubectl *kubernetes.Clientset, b v1.Container, 
 	}
 }
 
+func getExitCode(kubectl *kubernetes.Clientset, b v1.Container, buildUUID string) (int32, error) {
+	for {
+		pod, err := kubectl.CoreV1().Pods("default").Get(buildUUID, meta_v1.GetOptions{})
+		if err != nil {
+			return -1, errors.Wrap(err, "unable to get pod, while waiting for it")
+		}
+		for _, v := range pod.Status.ContainerStatuses {
+			if v.Name == b.Name {
+				if v.State.Terminated != nil && v.State.Terminated.Reason != "" {
+					return v.State.Terminated.ExitCode, nil
+				} else {
+					time.Sleep(2 * time.Second)
+				}
+			}
+		}
+	}
+}
 func registerLog(repo *Repo, step *Step, buildUUID string, name string, build *Build, kubectl *kubernetes.Clientset) {
 
 	bw := &BucketWriter{build: build, repo: repo, Step: name}
