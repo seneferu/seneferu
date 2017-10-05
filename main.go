@@ -270,16 +270,19 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 		return errors.Wrap(err, "unable to handle buildconfig file")
 	}
 
-	buildSteps, err := createBuildSteps(build, cfg)
+	var buildSteps []v1.Container
+	buildSteps = append(buildSteps, createGitContainer(build))
+	x, err := createBuildSteps(build, cfg)
+	buildSteps = append(buildSteps, x...)
 	if err != nil {
 		return errors.Wrap(err, "unable to create build steps")
 	}
+
 	services, err := createServiceSteps(cfg)
 	if err != nil {
 		return errors.Wrap(err, "unable to create service")
 	}
 
-	pod.Spec.Containers = append(pod.Spec.Containers, createGitContainer(build))
 	pod.Spec.Containers = append(pod.Spec.Containers, services...)
 	pod.Spec.Containers = append(pod.Spec.Containers, buildSteps...)
 
@@ -299,36 +302,38 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 	build.Status = "Running"
 	err = repo.Save(build)
 	if err != nil {
-		log.Fatal("Error while waiting for container ", err)
+		return errors.Wrap(err, "Error while waiting for container ")
 	}
-	for _, cc := range pod.Spec.Containers {
-		step := &Step{Name: cc.Name, Status: "Running"}
+
+	for _, b := range buildSteps {
+		step := &Step{Name: b.Name, Status: "Running"}
 		build.Steps = append(build.Steps, step)
 		repo.Save(build)
-		go func() {
-			bw := &BucketWriter{build: build, repo: repo, Step: cc.Name}
-			// start watching the logs in a separate go routine
-			err = saveLog(kubectl, buildUUID, cc.Name, bw)
-			if err != nil {
-				log.Println("Error while getting log ", err)
-			}
-			step.Status = "Done"
-			repo.Save(build)
-		}()
+		go registerLog(repo, step, buildUUID, b.Name, build, kubectl)
+	}
+	for _, b := range services {
+		service := &Service{Name: b.Name}
+		build.Services = append(build.Services, service)
+		err := repo.Save(build)
+		if err != nil {
+			log.Println("unable to save service...")
+		}
+		go registerLogForService(repo, buildUUID, b.Name, build, kubectl)
 	}
 
 	// wait for all the build steps to finish
 	fmt.Println("Waiting for build steps...")
 	for _, b := range buildSteps {
-		waitForStep(kubectl, b.Name)
+		waitForContainerTermintaion(kubectl, b, buildUUID)
+
 	}
 	fmt.Println("All build steps done...")
 
 	// TODO fix this
 	build.Success = true
+	build.Status = "Done"
 	repo.Save(build)
 
-	fmt.Println("Trying to get logs from builds")
 	// Fetch coverage configuration from settings
 	var testCoverage string
 	for _, c := range cfg.Pipeline.Containers {
@@ -344,6 +349,7 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 	repo.Save(build)
 
 	// clean up
+
 	err = kubectl.CoreV1().Pods("default").Delete(buildUUID, &meta_v1.DeleteOptions{})
 	if err != nil {
 		log.Println("Error while deleing pod: ", err)
@@ -355,6 +361,48 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 	fmt.Println("*****************************************")
 	return nil
 }
+
+func waitForContainerTermintaion(kubectl *kubernetes.Clientset, b v1.Container, buildUUID string) error {
+	for {
+		pod, err := kubectl.CoreV1().Pods("default").Get(buildUUID, meta_v1.GetOptions{})
+		if err != nil {
+			return errors.Wrap(err, "unable to get pod, while waiting for it")
+		}
+		for _, v := range pod.Status.ContainerStatuses {
+			if v.Name == b.Name {
+				if v.State.Terminated != nil && v.State.Terminated.Reason != "" {
+					return nil
+				} else {
+					time.Sleep(2 * time.Second)
+				}
+			}
+		}
+	}
+}
+
+func registerLog(repo *Repo, step *Step, buildUUID string, name string, build *Build, kubectl *kubernetes.Clientset) {
+
+	bw := &BucketWriter{build: build, repo: repo, Step: name}
+	// start watching the logs in a separate go routine
+	err := saveLog(kubectl, buildUUID, name, bw)
+	if err != nil {
+		log.Println("Error while getting log ", err)
+	}
+	step.Status = "Done"
+	repo.Save(build)
+}
+
+func registerLogForService(repo *Repo, buildUUID string, name string, build *Build, kubectl *kubernetes.Clientset) {
+
+	bw := &BucketWriter{build: build, repo: repo, Step: name}
+	// get the log without waiting, since its a service and it should be running for ever...
+	err := saveLog(kubectl, buildUUID, name, bw)
+	if err != nil {
+		log.Println("Error while getting log ", err)
+	}
+	repo.Save(build)
+}
+
 func getCoverageFromLogs(repo *Repo, buildNumber int, testCoverage string) string {
 	// Search for the coverage regex in the logs, and add it to the build if found
 	for _, b := range repo.Build {
@@ -383,64 +431,6 @@ func waitForContainer(kubectl *kubernetes.Clientset, buildname string) error {
 		}
 		if pod.Status.Phase == "Running" || pod.Status.Phase == "Succeeded" || pod.Status.Phase == "Failed" {
 			return nil
-		}
-		fmt.Println(pod.Status.Reason)
-		count++
-		time.Sleep(2 * time.Second)
-	}
-}
-
-func waitForStepToRun(kubectl *kubernetes.Clientset, buildname string) error {
-	count := 0
-	for {
-		pod, err := kubectl.CoreV1().Pods("default").Get(buildname, meta_v1.GetOptions{})
-		if err != nil {
-			return errors.Wrap(err, "unable to get container, while waiting for it")
-		}
-		if pod.Status.Phase == "Running" {
-			return nil
-
-		}
-		if pod.Status.Phase == "Failed" {
-			return nil
-		}
-		count++
-		time.Sleep(2 * time.Second)
-	}
-}
-
-func waitForStep(kubectl *kubernetes.Clientset, buildname string) error {
-	count := 0
-	for {
-		pod, err := kubectl.CoreV1().Pods("default").Get(buildname, meta_v1.GetOptions{})
-		if err != nil {
-			return errors.Wrap(err, "unable to get container, while waiting for it")
-		}
-		if pod.Status.Phase == "Succeeded" {
-			return nil
-
-		}
-		if pod.Status.Phase == "Failed" {
-			return nil
-		}
-		count++
-		time.Sleep(2 * time.Second)
-	}
-}
-
-func isContainerDone(kubectl *kubernetes.Clientset, buildname string) (bool, error) {
-	count := 0
-	for {
-		pod, err := kubectl.CoreV1().Pods("default").Get(buildname, meta_v1.GetOptions{})
-		if err != nil {
-			return false, errors.Wrap(err, "unable to get pod, while waiting for it")
-		}
-		if pod.Status.Phase == "Succeeded" {
-			return true, nil
-
-		}
-		if pod.Status.Phase == "Failed" {
-			return false, nil
 		}
 		fmt.Println(pod.Status.Reason)
 		count++

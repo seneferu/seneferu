@@ -8,5 +8,5 @@ ADD styles/ styles
 ADD index.html index.html
 
 
-ADD ci-server /ci-server
-ENTRYPOINT ["/ci-server"]
+ADD seneferu /seneferu
+ENTRYPOINT ["/seneferu"]

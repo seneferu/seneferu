@@ -62,8 +62,6 @@ func HandlePullRequest(payload interface{}, header webhooks.Header) {
 	fmt.Printf("%+v", pl)
 }
 
-type GithubHandler func(payload interface{}, header webhooks.Header)
-
 func HandlePush(db *storm.DB, kubectl *kubernetes.Clientset) webhooks.ProcessPayloadFunc {
 	return func(payload interface{}, header webhooks.Header) {
 		fmt.Println("Handling Push Request")
