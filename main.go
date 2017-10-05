@@ -327,6 +327,7 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 		waitForContainerTermination(kubectl, b, buildUUID)
 	}
 
+	build.Success = true
 	for _, b := range buildSteps {
 		for _, step := range build.Steps {
 			if step.Name == b.Name {
@@ -344,7 +345,6 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 	fmt.Println("All build steps done...")
 
 	// TODO fix this
-	build.Success = true
 	build.Status = "Done"
 	repo.Save(build)
 
