@@ -93,7 +93,7 @@ func HandlePush(db *storm.DB, kubectl *kubernetes.Clientset) webhooks.ProcessPay
 
 	}
 }
-func startUI(db *storm.DB, kubectl *kubernetes.Clientset, secret string) {
+func startWebServer(db *storm.DB, kubectl *kubernetes.Clientset, secret string) {
 
 	// Github hook
 	hook := github.New(&github.Config{Secret: secret})

@@ -10,3 +10,8 @@ pipeline:
       - go build
       - go list ./... |  grep -v vendor | xargs go list -f '{{.ImportPath}}' | xargs -L 1 -n 1 -I '{#}' bash -c 'go test {#} -coverprofile=testing`date +%s`.cover'
       - docker build -t sorenmat/test:${HASH} .
+
+services:
+  postgres:
+    image: postgres
+    
