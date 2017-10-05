@@ -20,9 +20,10 @@ type Build struct {
 }
 
 type Step struct {
-	Name   string `json:"name"`
-	Log    string `json:"build"`
-	Status string `json:"status"`
+	Name     string `json:"name"`
+	Log      string `json:"build"`
+	Status   string `json:"status"`
+	ExitCode int32  `json:"exitcode"`
 }
 type Service struct {
 	Name string `json:"name"`
