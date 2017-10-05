@@ -332,6 +332,8 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 			if step.Name == b.Name {
 				exitCode, _ := getExitCode(kubectl, b, buildUUID)
 				if exitCode > 0 {
+					build.Status = "Failed"
+					build.Success = false
 					step.Status = "Failed"
 				}
 				step.ExitCode = exitCode
