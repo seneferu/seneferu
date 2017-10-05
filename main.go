@@ -64,7 +64,7 @@ func startWeb(config *rest.Config) {
 	if err != nil {
 		panic(err.Error())
 	}
-	startUI(db, kubectl, *githubSecret)
+	startWebServer(db, kubectl, *githubSecret)
 }
 
 // generateScript is a helper function that generates a build script and base64 encode it.
@@ -163,6 +163,26 @@ func createBuildSteps(build *Build, cfg *yaml.Config) ([]v1.Container, error) {
 	return containers, nil
 }
 
+func createServiceSteps(cfg *yaml.Config) ([]v1.Container, error) {
+
+	var containers []v1.Container
+	for _, serv := range cfg.Services.Containers {
+		c := v1.Container{
+			Name:            serv.Name,
+			ImagePullPolicy: v1.PullIfNotPresent,
+			Image:           serv.Image,
+		}
+		if serv.Privileged {
+			c.VolumeMounts = append(c.VolumeMounts, v1.VolumeMount{
+				Name:      "docker-socket",
+				MountPath: "/var/run/docker.sock",
+			})
+		}
+		containers = append(containers, c)
+	}
+	return containers, nil
+}
+
 func doneCmd(count int) string {
 	doneStr := fmt.Sprintf("build%v", count)
 	doneCmd := "touch " + shareddir + "/" + doneStr + ".done"
@@ -254,7 +274,13 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 	if err != nil {
 		return errors.Wrap(err, "unable to create build steps")
 	}
+	services, err := createServiceSteps(cfg)
+	if err != nil {
+		return errors.Wrap(err, "unable to create service")
+	}
+
 	pod.Spec.Containers = append(pod.Spec.Containers, createGitContainer(build))
+	pod.Spec.Containers = append(pod.Spec.Containers, services...)
 	pod.Spec.Containers = append(pod.Spec.Containers, buildSteps...)
 
 	_, err = kubectl.CoreV1().Pods("default").Create(pod)
@@ -279,25 +305,30 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 		step := &Step{Name: cc.Name, Status: "Running"}
 		build.Steps = append(build.Steps, step)
 		repo.Save(build)
-		bw := &BucketWriter{build: build, repo: repo, Step: cc.Name}
-		err = saveLog(kubectl, buildUUID, cc.Name, bw)
-		if err != nil {
-			log.Println("Error while getting log ", err)
-		}
-		//repo = getRepo(repo.db, repo.Name)
-		step.Status = "Done"
-		repo.Save(build)
+		go func() {
+			bw := &BucketWriter{build: build, repo: repo, Step: cc.Name}
+			// start watching the logs in a separate go routine
+			err = saveLog(kubectl, buildUUID, cc.Name, bw)
+			if err != nil {
+				log.Println("Error while getting log ", err)
+			}
+			step.Status = "Done"
+			repo.Save(build)
+		}()
 	}
 
-	status, err := isContainerDone(kubectl, buildUUID)
-	if err != nil {
-		build.Success = status
-		repo.Save(build)
-		return errors.Wrap(err, "unable to wait for container to complete")
+	// wait for all the build steps to finish
+	fmt.Println("Waiting for build steps...")
+	for _, b := range buildSteps {
+		waitForStep(kubectl, b.Name)
 	}
-	build.Success = status
+	fmt.Println("All build steps done...")
+
+	// TODO fix this
+	build.Success = true
 	repo.Save(build)
 
+	fmt.Println("Trying to get logs from builds")
 	// Fetch coverage configuration from settings
 	var testCoverage string
 	for _, c := range cfg.Pipeline.Containers {
@@ -312,14 +343,16 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 	build.Coverage = coverage
 	repo.Save(build)
 
-	/*
-		// clean up
-		err = kubectl.Pods("default").Delete(buildname, &meta_v1.DeleteOptions{})
-		if err != nil {
-			build.Fatal("Error while deleing pod: ", err)
-		}
-		fmt.Println("Pod deleted!")
-	*/
+	// clean up
+	err = kubectl.CoreV1().Pods("default").Delete(buildUUID, &meta_v1.DeleteOptions{})
+	if err != nil {
+		log.Println("Error while deleing pod: ", err)
+		return errors.Wrap(err, "Error while deleing pod")
+	}
+	fmt.Println("Pod deleted!")
+	fmt.Println("*****************************************")
+	fmt.Println("Delcaring build done")
+	fmt.Println("*****************************************")
 	return nil
 }
 func getCoverageFromLogs(repo *Repo, buildNumber int, testCoverage string) string {
@@ -352,6 +385,44 @@ func waitForContainer(kubectl *kubernetes.Clientset, buildname string) error {
 			return nil
 		}
 		fmt.Println(pod.Status.Reason)
+		count++
+		time.Sleep(2 * time.Second)
+	}
+}
+
+func waitForStepToRun(kubectl *kubernetes.Clientset, buildname string) error {
+	count := 0
+	for {
+		pod, err := kubectl.CoreV1().Pods("default").Get(buildname, meta_v1.GetOptions{})
+		if err != nil {
+			return errors.Wrap(err, "unable to get container, while waiting for it")
+		}
+		if pod.Status.Phase == "Running" {
+			return nil
+
+		}
+		if pod.Status.Phase == "Failed" {
+			return nil
+		}
+		count++
+		time.Sleep(2 * time.Second)
+	}
+}
+
+func waitForStep(kubectl *kubernetes.Clientset, buildname string) error {
+	count := 0
+	for {
+		pod, err := kubectl.CoreV1().Pods("default").Get(buildname, meta_v1.GetOptions{})
+		if err != nil {
+			return errors.Wrap(err, "unable to get container, while waiting for it")
+		}
+		if pod.Status.Phase == "Succeeded" {
+			return nil
+
+		}
+		if pod.Status.Phase == "Failed" {
+			return nil
+		}
 		count++
 		time.Sleep(2 * time.Second)
 	}

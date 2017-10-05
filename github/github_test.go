@@ -4,17 +4,17 @@ package github
 
 import (
 	"bytes"
+	"crypto/hmac"
+	sha12 "crypto/sha1"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"testing"
-	"crypto/hmac"
-	sha12 "crypto/sha1"
-	"encoding/hex"
 )
 
 func TestPayload(t *testing.T) {
-	req, err := http.NewRequest("POST", "http://localhost:8080/webhook?access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0ZXh0IjoiVHJhZGVzaGlmdC90cnVlYm4tZ2FiYnkiLCJ0eXBlIjoiaG9vayJ9.ev_sUvp7lE4NtXFIMTkR7qf7lw0zK9IH3ZdBNtSvJTI", bytes.NewBufferString(payload))
+	req, err := http.NewRequest("POST", "http://localhost:8080/webhook?access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0ZXh0IjoiVHJhZGVzaGlmdC90cnVlYm4tZ2FiYnkiLCJ0eXBlIjoiaG9vayJ9.ev_sUvp7lE4NtXFIMTkR7qf7lw0zK9IH3ZdBNtSvJTI", bytes.NewBufferString(payload2))
 	if err != nil {
 		t.Error(err)
 	}
@@ -24,7 +24,7 @@ func TestPayload(t *testing.T) {
 	req.Header.Set("X-GitHub-Event", "push")
 
 	hashing := hmac.New(sha12.New, []byte("supersecretpassword..nice"))
-	hashing.Write([]byte(payload))
+	hashing.Write([]byte(payload2))
 	req.Header.Set("X-Hub-Signature", "sha1="+hex.EncodeToString(hashing.Sum(nil)))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -248,6 +248,189 @@ const payload = `{
     "repos_url": "https://api.github.com/users/callebjorkell/repos",
     "events_url": "https://api.github.com/users/callebjorkell/events{/privacy}",
     "received_events_url": "https://api.github.com/users/callebjorkell/received_events",
+    "type": "User",
+    "site_admin": false
+  }
+}`
+
+const payload2 = `{
+  "ref": "refs/heads/master",
+  "before": "13d4e4dcf18e5915ff77ef2a59d2322f0aa6c9ff",
+  "after": "0fd9ce62026bf40f64235f9cd766eae01736f713",
+  "created": false,
+  "deleted": false,
+  "forced": false,
+  "base_ref": null,
+  "compare": "https://github.com/sorenmat/buildtest/compare/13d4e4dcf18e...0fd9ce62026b",
+  "commits": [
+    {
+      "id": "0fd9ce62026bf40f64235f9cd766eae01736f713",
+      "tree_id": "954c729f83dc8845a002347714f71aed46e32c9e",
+      "distinct": true,
+      "message": "made test more reliable",
+      "timestamp": "2017-10-05T09:38:06+02:00",
+      "url": "https://github.com/sorenmat/buildtest/commit/0fd9ce62026bf40f64235f9cd766eae01736f713",
+      "author": {
+        "name": "Soren Mathiasen",
+        "email": "smo@tradeshift.com",
+        "username": "sorenmat"
+      },
+      "committer": {
+        "name": "Soren Mathiasen",
+        "email": "smo@tradeshift.com",
+        "username": "sorenmat"
+      },
+      "added": [
+
+      ],
+      "removed": [
+
+      ],
+      "modified": [
+        "main_test.go"
+      ]
+    }
+  ],
+  "head_commit": {
+    "id": "0fd9ce62026bf40f64235f9cd766eae01736f713",
+    "tree_id": "954c729f83dc8845a002347714f71aed46e32c9e",
+    "distinct": true,
+    "message": "made test more reliable",
+    "timestamp": "2017-10-05T09:38:06+02:00",
+    "url": "https://github.com/sorenmat/buildtest/commit/0fd9ce62026bf40f64235f9cd766eae01736f713",
+    "author": {
+      "name": "Soren Mathiasen",
+      "email": "smo@tradeshift.com",
+      "username": "sorenmat"
+    },
+    "committer": {
+      "name": "Soren Mathiasen",
+      "email": "smo@tradeshift.com",
+      "username": "sorenmat"
+    },
+    "added": [
+
+    ],
+    "removed": [
+
+    ],
+    "modified": [
+      "main_test.go"
+    ]
+  },
+  "repository": {
+    "id": 105780377,
+    "name": "buildtest",
+    "full_name": "sorenmat/buildtest",
+    "owner": {
+      "name": "sorenmat",
+      "email": "smo@tradeshift.com",
+      "login": "sorenmat",
+      "id": 335103,
+      "avatar_url": "https://avatars1.githubusercontent.com/u/335103?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/sorenmat",
+      "html_url": "https://github.com/sorenmat",
+      "followers_url": "https://api.github.com/users/sorenmat/followers",
+      "following_url": "https://api.github.com/users/sorenmat/following{/other_user}",
+      "gists_url": "https://api.github.com/users/sorenmat/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/sorenmat/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/sorenmat/subscriptions",
+      "organizations_url": "https://api.github.com/users/sorenmat/orgs",
+      "repos_url": "https://api.github.com/users/sorenmat/repos",
+      "events_url": "https://api.github.com/users/sorenmat/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/sorenmat/received_events",
+      "type": "User",
+      "site_admin": false
+    },
+    "private": false,
+    "html_url": "https://github.com/sorenmat/buildtest",
+    "description": null,
+    "fork": false,
+    "url": "https://github.com/sorenmat/buildtest",
+    "forks_url": "https://api.github.com/repos/sorenmat/buildtest/forks",
+    "keys_url": "https://api.github.com/repos/sorenmat/buildtest/keys{/key_id}",
+    "collaborators_url": "https://api.github.com/repos/sorenmat/buildtest/collaborators{/collaborator}",
+    "teams_url": "https://api.github.com/repos/sorenmat/buildtest/teams",
+    "hooks_url": "https://api.github.com/repos/sorenmat/buildtest/hooks",
+    "issue_events_url": "https://api.github.com/repos/sorenmat/buildtest/issues/events{/number}",
+    "events_url": "https://api.github.com/repos/sorenmat/buildtest/events",
+    "assignees_url": "https://api.github.com/repos/sorenmat/buildtest/assignees{/user}",
+    "branches_url": "https://api.github.com/repos/sorenmat/buildtest/branches{/branch}",
+    "tags_url": "https://api.github.com/repos/sorenmat/buildtest/tags",
+    "blobs_url": "https://api.github.com/repos/sorenmat/buildtest/git/blobs{/sha}",
+    "git_tags_url": "https://api.github.com/repos/sorenmat/buildtest/git/tags{/sha}",
+    "git_refs_url": "https://api.github.com/repos/sorenmat/buildtest/git/refs{/sha}",
+    "trees_url": "https://api.github.com/repos/sorenmat/buildtest/git/trees{/sha}",
+    "statuses_url": "https://api.github.com/repos/sorenmat/buildtest/statuses/{sha}",
+    "languages_url": "https://api.github.com/repos/sorenmat/buildtest/languages",
+    "stargazers_url": "https://api.github.com/repos/sorenmat/buildtest/stargazers",
+    "contributors_url": "https://api.github.com/repos/sorenmat/buildtest/contributors",
+    "subscribers_url": "https://api.github.com/repos/sorenmat/buildtest/subscribers",
+    "subscription_url": "https://api.github.com/repos/sorenmat/buildtest/subscription",
+    "commits_url": "https://api.github.com/repos/sorenmat/buildtest/commits{/sha}",
+    "git_commits_url": "https://api.github.com/repos/sorenmat/buildtest/git/commits{/sha}",
+    "comments_url": "https://api.github.com/repos/sorenmat/buildtest/comments{/number}",
+    "issue_comment_url": "https://api.github.com/repos/sorenmat/buildtest/issues/comments{/number}",
+    "contents_url": "https://api.github.com/repos/sorenmat/buildtest/contents/{+path}",
+    "compare_url": "https://api.github.com/repos/sorenmat/buildtest/compare/{base}...{head}",
+    "merges_url": "https://api.github.com/repos/sorenmat/buildtest/merges",
+    "archive_url": "https://api.github.com/repos/sorenmat/buildtest/{archive_format}{/ref}",
+    "downloads_url": "https://api.github.com/repos/sorenmat/buildtest/downloads",
+    "issues_url": "https://api.github.com/repos/sorenmat/buildtest/issues{/number}",
+    "pulls_url": "https://api.github.com/repos/sorenmat/buildtest/pulls{/number}",
+    "milestones_url": "https://api.github.com/repos/sorenmat/buildtest/milestones{/number}",
+    "notifications_url": "https://api.github.com/repos/sorenmat/buildtest/notifications{?since,all,participating}",
+    "labels_url": "https://api.github.com/repos/sorenmat/buildtest/labels{/name}",
+    "releases_url": "https://api.github.com/repos/sorenmat/buildtest/releases{/id}",
+    "deployments_url": "https://api.github.com/repos/sorenmat/buildtest/deployments",
+    "created_at": 1507128378,
+    "updated_at": "2017-10-04T14:54:36Z",
+    "pushed_at": 1507189093,
+    "git_url": "git://github.com/sorenmat/buildtest.git",
+    "ssh_url": "git@github.com:sorenmat/buildtest.git",
+    "clone_url": "https://github.com/sorenmat/buildtest.git",
+    "svn_url": "https://github.com/sorenmat/buildtest",
+    "homepage": null,
+    "size": 1,
+    "stargazers_count": 0,
+    "watchers_count": 0,
+    "language": "Go",
+    "has_issues": true,
+    "has_projects": true,
+    "has_downloads": true,
+    "has_wiki": true,
+    "has_pages": false,
+    "forks_count": 0,
+    "mirror_url": null,
+    "open_issues_count": 0,
+    "forks": 0,
+    "open_issues": 0,
+    "watchers": 0,
+    "default_branch": "master",
+    "stargazers": 0,
+    "master_branch": "master"
+  },
+  "pusher": {
+    "name": "sorenmat",
+    "email": "smo@tradeshift.com"
+  },
+  "sender": {
+    "login": "sorenmat",
+    "id": 335103,
+    "avatar_url": "https://avatars1.githubusercontent.com/u/335103?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/sorenmat",
+    "html_url": "https://github.com/sorenmat",
+    "followers_url": "https://api.github.com/users/sorenmat/followers",
+    "following_url": "https://api.github.com/users/sorenmat/following{/other_user}",
+    "gists_url": "https://api.github.com/users/sorenmat/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/sorenmat/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/sorenmat/subscriptions",
+    "organizations_url": "https://api.github.com/users/sorenmat/orgs",
+    "repos_url": "https://api.github.com/users/sorenmat/repos",
+    "events_url": "https://api.github.com/users/sorenmat/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/sorenmat/received_events",
     "type": "User",
     "site_admin": false
   }

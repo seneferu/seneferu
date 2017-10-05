@@ -91,6 +91,7 @@ pipeline:
 ```
 
 2. How do I get test coverage for my build
+
 ```yaml
 pipeline:
   build:
@@ -104,9 +105,7 @@ pipeline:
 
 ```
 
-
-
-2. Known environment variables
+3. Known environment variables
    `GIT_REF` ref to the git hash being build, the head of the branch
 
 
