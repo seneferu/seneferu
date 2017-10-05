@@ -38,6 +38,11 @@ func (b *BucketWriter) Write(p []byte) (n int, err error) {
 			s.Log = s.Log + string(p)
 		}
 	}
+	for _, s := range build.Services {
+		if s.Name == b.Step {
+			s.Log = s.Log + string(p)
+		}
+	}
 
 	err = b.repo.Save(b.build)
 	if err != nil {
