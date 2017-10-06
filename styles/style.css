@@ -23,7 +23,7 @@ body {
     color: black;
 }
 
-.build-panel {
+.build-panel > panel-body {
     max-height: 400px;
     overflow: scroll;
 }
@@ -36,4 +36,14 @@ body {
     height: 400px;
     max-height: 400px;
     overflow: scroll;
+}
+
+::-webkit-scrollbar {
+    background-color: #fff;
+	width: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    -webkit-box-shadow: inset 0 0 3px rgba(0,0,0,0.2);
+    border-radius: 8px;
 }
