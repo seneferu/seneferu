@@ -331,7 +331,7 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 	for _, b := range buildSteps {
 		for _, step := range build.Steps {
 			if step.Name == b.Name {
-				exitCode, _ := getExitCode(kubectl, b, buildUUID)
+				exitCode, _ := waitForContainerTermination(kubectl, b, buildUUID)
 				if exitCode > 0 {
 					build.Status = "Failed"
 					build.Success = false
@@ -342,7 +342,7 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 		}
 	}
 
-	fmt.Println("All build steps done...")
+	log.Println("All build steps done...")
 
 	// TODO fix this
 	build.Status = "Done"
@@ -369,32 +369,14 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 		log.Println("Error while deleing pod: ", err)
 		return errors.Wrap(err, "Error while deleing pod")
 	}
-	fmt.Println("Pod deleted!")
-	fmt.Println("*****************************************")
-	fmt.Println("Delcaring build done")
-	fmt.Println("*****************************************")
+	log.Println("Pod deleted!")
+	log.Println("*****************************************")
+	log.Println("Delcaring build done")
+	log.Println("*****************************************")
 	return nil
 }
 
-func waitForContainerTermination(kubectl *kubernetes.Clientset, b v1.Container, buildUUID string) error {
-	for {
-		pod, err := kubectl.CoreV1().Pods("default").Get(buildUUID, meta_v1.GetOptions{})
-		if err != nil {
-			return errors.Wrap(err, "unable to get pod, while waiting for it")
-		}
-		for _, v := range pod.Status.ContainerStatuses {
-			if v.Name == b.Name {
-				if v.State.Terminated != nil && v.State.Terminated.Reason != "" {
-					return nil
-				} else {
-					time.Sleep(2 * time.Second)
-				}
-			}
-		}
-	}
-}
-
-func getExitCode(kubectl *kubernetes.Clientset, b v1.Container, buildUUID string) (int32, error) {
+func waitForContainerTermination(kubectl *kubernetes.Clientset, b v1.Container, buildUUID string) (int32, error) {
 	for {
 		pod, err := kubectl.CoreV1().Pods("default").Get(buildUUID, meta_v1.GetOptions{})
 		if err != nil {
@@ -411,6 +393,7 @@ func getExitCode(kubectl *kubernetes.Clientset, b v1.Container, buildUUID string
 		}
 	}
 }
+
 func registerLog(repo *Repo, step *Step, buildUUID string, name string, build *Build, kubectl *kubernetes.Clientset) {
 
 	bw := &BucketWriter{build: build, repo: repo, Step: name}
@@ -424,7 +407,6 @@ func registerLog(repo *Repo, step *Step, buildUUID string, name string, build *B
 }
 
 func registerLogForService(repo *Repo, buildUUID string, name string, build *Build, kubectl *kubernetes.Clientset) {
-
 	bw := &BucketWriter{build: build, repo: repo, Step: name}
 	// get the log without waiting, since its a service and it should be running for ever...
 	err := saveLog(kubectl, buildUUID, name, bw)
@@ -454,7 +436,6 @@ func getCoverageFromLogs(repo *Repo, buildNumber int, testCoverage string) strin
 }
 
 func waitForContainer(kubectl *kubernetes.Clientset, buildname string) error {
-	count := 0
 	for {
 		pod, err := kubectl.CoreV1().Pods("default").Get(buildname, meta_v1.GetOptions{})
 		if err != nil {
@@ -463,15 +444,14 @@ func waitForContainer(kubectl *kubernetes.Clientset, buildname string) error {
 		if pod.Status.Phase == "Running" || pod.Status.Phase == "Succeeded" || pod.Status.Phase == "Failed" {
 			return nil
 		}
-		fmt.Println(pod.Status.Reason)
-		count++
+		log.Println(pod.Status.Reason)
 		time.Sleep(2 * time.Second)
 	}
 }
 
 // saveLog get the build of container in a running pod
 func saveLog(clientset *kubernetes.Clientset, pod string, container string, bw *BucketWriter) error {
-	fmt.Printf("Trying to get log for %v %v\n", pod, container)
+	log.Printf("Trying to get log for %v %v\n", pod, container)
 	req := clientset.CoreV1().Pods("default").GetLogs(pod, &v1.PodLogOptions{
 		Container: container,
 		Follow:    true,
