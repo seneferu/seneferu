@@ -59,7 +59,7 @@ function handleRepoClick(repoData) {
         var time = moment(build.timestamp).format('MMMM Do, HH:mm:ss');
         var buildRow = $('<tr></tr>');
         buildRow.append("<td><span class='glyphicon "
-            + (build.success ? "glyphicon-ok" : "glyphicon-remove")
+            + (getBuildStatusIcon(build.status, build.success))
             + "'></span></td>");
         buildRow.append('<td>' + build.number + '</a></td>');
         buildRow.append('<td>' + time + '</td>');
@@ -69,12 +69,16 @@ function handleRepoClick(repoData) {
     });
 }
 
-function getBuildStatusIcon(status) {
-    if (status === "Done")
-        return "glyphicon-ok"
-    if (status === "Started" || status === "Running")
-        return "glyphicon-hourglass"
-    return "glyphicon-remove"
+function getBuildStatusIcon(status, success) {
+    if (status === "Done") {
+		if (success) {
+			return "glyphicon-ok"
+		} else {
+			return "glyphicon-remove"
+		}
+	} else {
+		return "glyphicon-hourglass"
+	}
 }
 
 function handleBuildClick(buildData) {
@@ -90,7 +94,7 @@ function handleBuildClick(buildData) {
         var stepRow = $('<tr></tr>');
 
         stepRow.append("<td><span class='glyphicon "
-            + (getBuildStatusIcon(step.status))
+            + (getBuildStatusIcon(step.status, step.exitcode == 0))
             + "'></span></td>");
 
 
