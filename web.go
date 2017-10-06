@@ -131,24 +131,15 @@ func logStream(c echo.Context) error {
 
 		defer ws.Close()
 		sockets = append(sockets, ws)
-		/*		for {
+		for {
 
-					// TODO is this needed ????
-					msg := ""
-					err := websocket.Message.Receive(ws, &msg)
-					if err != nil {
-						c.Logger().Error(err)
-					}
-					fmt.Printf("%s\n", msg)
-
-				}
-		*/
-		msg := ""
-		err := websocket.Message.Receive(ws, &msg)
-		if err != nil {
-			c.Logger().Error(err)
+			msg := ""
+			err := websocket.Message.Receive(ws, &msg)
+			if err != nil {
+				c.Logger().Error(err)
+			}
+			fmt.Printf("%s\n", msg)
 		}
-		fmt.Printf("%s\n", msg)
 	}).ServeHTTP(c.Response(), c.Request())
 	return nil
 }
@@ -171,7 +162,11 @@ func handleFetchBuilds(db *storm.DB) echo.HandlerFunc {
 func handleFetchRepoData(db *storm.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		id := c.Param("id")
-		return c.JSON(200, getRepo(db, id))
+		err := c.JSON(200, getRepo(db, id))
+		if err != nil {
+			log.Println("unable to marshal json")
+		}
+		return err
 	}
 }
 
@@ -248,16 +243,16 @@ func handleStatus() echo.HandlerFunc {
 
 func getRepo(db *storm.DB, name string) *Repo {
 
-	err := db.Update(func(tx *bolt.Tx) error {
-		fmt.Println("about to create bucket: ", name)
+	updateFunc := func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(name))
 		if err != nil {
 			return fmt.Errorf("create bucket: %s", err)
 		}
 		return nil
-	})
+	}
+	err := db.Bolt.Update(updateFunc)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Bucket error:", err)
 	}
 	repo := &Repo{db: db}
 

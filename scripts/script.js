@@ -53,7 +53,7 @@ function handleRepoClick(repoData) {
     buildPanel.addClass("panel panel-default");
     buildPanel.append('<div class="panel-heading"> Current Builds for <a href="' + repoData.url + '">' + repoData.name + '</a></div>');
     buildPanel.append('<div class="panel-body"><div id="build-area" class="table-responsive"></div></div>');
-    $('#build-area').append('<table class="table table-striped"> <thead> <tr> <th>Result</th> <th>Build Id</th> <th>Time</th> <th>Committers</th> </tr> </thead><tbody id="all-builds"></tbody></table>');
+    $('#build-area').append('<table class="table table-striped"> <thead> <tr> <th>Result</th> <th>Build Id</th> <th>Time</th> <th>Duration</th><th>Committers</th> </tr> </thead><tbody id="all-builds"></tbody></table>');
     var table = $('#all-builds');
     repoData.builds.forEach(function (build) {
         var time = moment(build.timestamp).format('MMMM Do, HH:mm:ss');
@@ -63,6 +63,7 @@ function handleRepoClick(repoData) {
             + "'></span></td>");
         buildRow.append('<td>' + build.number + '</a></td>');
         buildRow.append('<td>' + time + '</td>');
+        buildRow.append('<td>' + build.took + '</td>');
         buildRow.append('<td>' + build.committers + '</td>');
         buildRow.click(getBuildData.bind(null, repoData.id, build.number));
         table.append(buildRow);
@@ -85,7 +86,9 @@ function handleBuildClick(buildData) {
     buildSteps.append('<div class="panel-heading"> <h3>Build Steps for ' + buildData.number + '</h3></div>');
     buildSteps.append('<div class="panel-body"><div id="build-step-area" class="table-responsive"></div></div>');
     $('#build-step-area').append('<table class="table table-striped"> <thead> <tr> <th>Status</th> <th>Step Name</th></tr> </thead><tbody id="all-steps"></tbody></table>');
+    $('#build-step-area').append('<table class="table table-striped"> <thead> <tr><th>Service</th></tr> </thead><tbody id="all-services"></tbody></table>');
     var table = $('#all-steps');
+    var servicesTable = $('#all-services');
     buildData.steps.forEach(function (step) {
         var stepRow = $('<tr></tr>');
 
@@ -97,6 +100,13 @@ function handleBuildClick(buildData) {
         stepRow.append('<td>' + step.name + '</td>');
         stepRow.click(handleStepClick.bind(null, step));
         table.append(stepRow);
+    });
+    buildData.services.forEach(function (step) {
+        var stepRow = $('<tr></tr>');
+
+        stepRow.append('<td>' + step.name + '</td>');
+        stepRow.click(handleStepClick.bind(null, step));
+        servicesTable.append(stepRow);
     });
 }
 
@@ -112,7 +122,7 @@ function handleStepClick(step) {
     output.append('<div class="panel-body output-panelbody"><div id="output-log">' + html + '</div></div>');
     if (step.status === 'Running') {
         if (ws == null) {
-            ws = new WebSocket("ws://localhost:8080/ws");
+            ws = new WebSocket("ws://"+document.location.host+"/ws");
         }
         ws.onopen = function () {
             console.log('Connected')
