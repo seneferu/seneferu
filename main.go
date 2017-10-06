@@ -31,6 +31,7 @@ const shareddir = "/share"
 var (
 	kubeCfgFile  = flag.String("kubeconfig", "", "Kubernetes Config File")
 	githubSecret = flag.String("githubsecret", "", "Github secret token, needs to match the one on Github ")
+	helmHost     = flag.String("helmhost", "", "Hostname and port of the Helm host / tiller")
 )
 
 func main() {
@@ -41,6 +42,13 @@ func main() {
 	if *githubSecret == "" {
 		log.Fatal("githubsecret can't be empty")
 	}
+	if *helmHost == "" {
+		*helmHost = os.Getenv("githubsecret")
+	}
+	if *helmHost == "" {
+		log.Fatal("helmHost can't be empty")
+	}
+
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		log.Println("Appears we are not running in a cluster")
@@ -66,7 +74,7 @@ func startWeb(config *rest.Config) {
 	if err != nil {
 		panic(err.Error())
 	}
-	startWebServer(db, kubectl, *githubSecret)
+	startWebServer(db, kubectl, *githubSecret, *helmHost)
 }
 
 // generateScript is a helper function that generates a build script and base64 encode it.
