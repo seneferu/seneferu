@@ -9,18 +9,13 @@ import (
 	"github.com/asdine/storm"
 	"github.com/boltdb/bolt"
 	"github.com/labstack/echo"
-	"github.com/phayes/hookserve/hookserve"
 	"golang.org/x/net/websocket"
 	"gopkg.in/go-playground/webhooks.v3"
 	"gopkg.in/go-playground/webhooks.v3/github"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/helm/pkg/helm"
 )
 
-/*
-func (r *Repo) getDB() *storm.DB {
-	return r.db
-}
-*/
 func (r *Repo) Save(b *Build) error {
 	added := false
 	for _, v := range r.Build {
@@ -91,6 +86,7 @@ func HandlePush(db *storm.DB, kubectl *kubernetes.Clientset) webhooks.ProcessPay
 
 	}
 }
+
 func startWebServer(db *storm.DB, kubectl *kubernetes.Clientset, secret string) {
 
 	// Github hook
@@ -98,10 +94,6 @@ func startWebServer(db *storm.DB, kubectl *kubernetes.Clientset, secret string) 
 	hook.RegisterEvents(HandleRelease, github.ReleaseEvent)
 	hook.RegisterEvents(HandlePullRequest, github.PullRequestEvent)
 	hook.RegisterEvents(HandlePush(db, kubectl), github.PushEvent)
-
-	server := hookserve.NewServer()
-	server.IgnoreTags = false
-	//server.Secret = "supersecretcode"
 
 	e := echo.New()
 
@@ -114,6 +106,7 @@ func startWebServer(db *storm.DB, kubectl *kubernetes.Clientset, secret string) 
 	e.GET("/repo/:id", handleFetchRepoData(db))
 	e.GET("/repo/:id/builds", handleFetchBuilds(db))
 	e.GET("/repo/:id/build/:buildid", handleFetchBuild(db))
+	e.GET("/helm/:release", handleHelm())
 	e.GET("/ws", logStream)
 
 	// handle github web hook
@@ -136,7 +129,7 @@ func logStream(c echo.Context) error {
 		sockets = append(sockets, ws)
 		for {
 
-			// Read
+			// TODO is this needed ????
 			msg := ""
 			err := websocket.Message.Receive(ws, &msg)
 			if err != nil {
@@ -168,6 +161,35 @@ func handleFetchRepoData(db *storm.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		id := c.Param("id")
 		return c.JSON(200, getRepo(db, id))
+	}
+}
+
+func handleHelm() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		release := c.Param("release")
+		if release == "" {
+			c.Error(fmt.Errorf("release can't be empty"))
+		}
+		client := helm.NewClient(helm.Host("localhost:44134"))
+
+		_, err := client.GetVersion()
+		if err != nil {
+			c.Error(err)
+		}
+
+		list, err := client.ReleaseHistory(release, helm.WithMaxHistory(10))
+		if err != nil {
+			c.Error(err)
+		}
+
+		var deployments []Deployment
+		for _, v := range list.GetReleases() {
+			d := Deployment{Version: strconv.Itoa(int(v.Version)), Name: v.Name, Status: v.GetInfo().GetStatus().Code.String(), Description: v.GetInfo().GetDescription()}
+			deployments = append(deployments, d)
+		}
+		c.JSON(200, deployments)
+
+		return nil
 	}
 }
 

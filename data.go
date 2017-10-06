@@ -36,3 +36,11 @@ type Repo struct {
 	Url   string   `json:"url"`
 	Build []*Build `json:"builds"`
 }
+
+// Deployment is a structure defining a Helm deployment
+type Deployment struct {
+	Version     string `json:"version"`
+	Name        string `json:"name"`
+	Status      string `json:"status"`
+	Description string `json:"description"`
+}
