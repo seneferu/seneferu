@@ -107,8 +107,8 @@ func startWebServer(db *storm.DB, kubectl *kubernetes.Clientset, secret string) 
 	e.GET("/repo/:id/builds", handleFetchBuilds(db))
 	e.GET("/repo/:id/build/:buildid", handleFetchBuild(db))
 	e.GET("/helm/:release", handleHelm())
+	//e.GET("/ws/:repo/build/:buildid/:step", logStream)
 	e.GET("/ws", logStream)
-
 	// handle github web hook
 	e.Any("/webhook", func(c echo.Context) (err error) {
 		req := c.Request()
@@ -124,19 +124,21 @@ func startWebServer(db *storm.DB, kubectl *kubernetes.Clientset, secret string) 
 var sockets []*websocket.Conn
 
 func logStream(c echo.Context) error {
-	websocket.Handler(func(ws *websocket.Conn) {
+	/*	repo := c.Param("repo")
+		buildid := c.Param("buildid")
+		step := c.Param("step")
+	*/websocket.Handler(func(ws *websocket.Conn) {
+
 		defer ws.Close()
 		sockets = append(sockets, ws)
 		for {
 
-			// TODO is this needed ????
 			msg := ""
 			err := websocket.Message.Receive(ws, &msg)
 			if err != nil {
 				c.Logger().Error(err)
 			}
 			fmt.Printf("%s\n", msg)
-
 		}
 	}).ServeHTTP(c.Response(), c.Request())
 	return nil
@@ -160,7 +162,11 @@ func handleFetchBuilds(db *storm.DB) echo.HandlerFunc {
 func handleFetchRepoData(db *storm.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		id := c.Param("id")
-		return c.JSON(200, getRepo(db, id))
+		err := c.JSON(200, getRepo(db, id))
+		if err != nil {
+			log.Println("unable to marshal json")
+		}
+		return err
 	}
 }
 
@@ -237,16 +243,16 @@ func handleStatus() echo.HandlerFunc {
 
 func getRepo(db *storm.DB, name string) *Repo {
 
-	err := db.Update(func(tx *bolt.Tx) error {
-		fmt.Println("about to create bucket: ", name)
+	updateFunc := func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(name))
 		if err != nil {
 			return fmt.Errorf("create bucket: %s", err)
 		}
 		return nil
-	})
+	}
+	err := db.Bolt.Update(updateFunc)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Bucket error:", err)
 	}
 	repo := &Repo{db: db}
 

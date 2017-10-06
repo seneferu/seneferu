@@ -22,6 +22,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"strconv"
+	"strings"
 )
 
 const shareddir = "/share"
@@ -360,6 +362,11 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 	// Add coverage to build
 	coverage := getCoverageFromLogs(repo, buildNumber, testCoverage)
 	build.Coverage = coverage
+
+	// calculate the time the build took
+	t := time.Now().Sub(build.Timestamp)
+	build.Took = formatDuration(t)
+
 	repo.Save(build)
 
 	// clean up
@@ -369,11 +376,69 @@ func executeBuild(kubectl *kubernetes.Clientset, build *Build, repo *Repo) error
 		log.Println("Error while deleing pod: ", err)
 		return errors.Wrap(err, "Error while deleing pod")
 	}
+
 	log.Println("Pod deleted!")
 	log.Println("*****************************************")
 	log.Println("Delcaring build done")
 	log.Println("*****************************************")
 	return nil
+}
+
+func formatDuration(d time.Duration) string {
+	// taken from github.com/hako/durafmt
+	var (
+		units = []string{"days", "hours", "minutes", "seconds"}
+	)
+
+	var duration string
+	input := d.String()
+
+	// Convert duration.
+	seconds := int(d.Seconds()) % 60
+	minutes := int(d.Minutes()) % 60
+	hours := int(d.Hours()) % 24
+	days := int(d/(24*time.Hour)) % 365 % 7
+	// Create a map of the converted duration time.
+	durationMap := map[string]int{
+		"seconds": seconds,
+		"minutes": minutes,
+		"hours":   hours,
+		"days":    days,
+	}
+
+	// Construct duration string.
+	for _, u := range units {
+		v := durationMap[u]
+		strval := strconv.Itoa(v)
+		switch {
+		// add to the duration string if v > 1.
+		case v > 1:
+			duration += strval + " " + u + " "
+			// remove the plural 's', if v is 1.
+		case v == 1:
+			duration += strval + " " + strings.TrimRight(u, "s") + " "
+			// omit any value with 0s or 0.
+		case d.String() == "0" || d.String() == "0s":
+			// note: milliseconds and minutes have the same suffix (m)
+			// so we have to check if the units match with the suffix.
+
+			// check for a suffix that is NOT the milliseconds suffix.
+			if strings.HasSuffix(input, string(u[0])) && !strings.Contains(input, "ms") {
+				// if it happens that the units are milliseconds, skip.
+				if u == "milliseconds" {
+					continue
+				}
+				duration += strval + " " + u
+			}
+			break
+			// omit any value with 0.
+		case v == 0:
+			continue
+		}
+	}
+	// trim any remaining spaces.
+	duration = strings.TrimSpace(duration)
+	return duration
 }
 
 func waitForContainerTermination(kubectl *kubernetes.Clientset, b v1.Container, buildUUID string) (int32, error) {

@@ -11,6 +11,7 @@ type BucketWriter struct {
 	build *Build
 	Step  string
 }
+
 type Payload struct {
 	Step string
 	Line string
