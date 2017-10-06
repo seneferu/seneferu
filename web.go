@@ -87,7 +87,7 @@ func HandlePush(db *storm.DB, kubectl *kubernetes.Clientset) webhooks.ProcessPay
 	}
 }
 
-func startWebServer(db *storm.DB, kubectl *kubernetes.Clientset, secret string) {
+func startWebServer(db *storm.DB, kubectl *kubernetes.Clientset, secret string, helmHost string) {
 
 	// Github hook
 	hook := github.New(&github.Config{Secret: secret})
@@ -106,7 +106,7 @@ func startWebServer(db *storm.DB, kubectl *kubernetes.Clientset, secret string) 
 	e.GET("/repo/:id", handleFetchRepoData(db))
 	e.GET("/repo/:id/builds", handleFetchBuilds(db))
 	e.GET("/repo/:id/build/:buildid", handleFetchBuild(db))
-	e.GET("/helm/:release", handleHelm())
+	e.GET("/helm/:release", handleHelm(helmHost))
 	//e.GET("/ws/:repo/build/:buildid/:step", logStream)
 	e.GET("/ws", logStream)
 	// handle github web hook
@@ -170,13 +170,13 @@ func handleFetchRepoData(db *storm.DB) echo.HandlerFunc {
 	}
 }
 
-func handleHelm() echo.HandlerFunc {
+func handleHelm(host string) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		release := c.Param("release")
 		if release == "" {
 			c.Error(fmt.Errorf("release can't be empty"))
 		}
-		client := helm.NewClient(helm.Host("localhost:44134"))
+		client := helm.NewClient(helm.Host(host))
 
 		_, err := client.GetVersion()
 		if err != nil {
