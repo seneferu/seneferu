@@ -69,12 +69,6 @@
 			"revisionTime": "2017-09-14T17:45:32Z"
 		},
 		{
-			"checksumSHA1": "VZEf4sUe0jVi3TPXE+gfjpKtXFA=",
-			"path": "github.com/cncd/pipeline/pipeline/frontend/yaml",
-			"revision": "b7427ae1fb86bb04e2997e5f3a1eec75c4b056ef",
-			"revisionTime": "2017-09-14T17:45:32Z"
-		},
-		{
 			"checksumSHA1": "L7Q5qJmPITNmvFEEaj5MPwCWFRk=",
 			"path": "github.com/cncd/pipeline/pipeline/frontend/yaml/types",
 			"revision": "b7427ae1fb86bb04e2997e5f3a1eec75c4b056ef",
@@ -356,12 +350,6 @@
 			"path": "github.com/peterbourgon/diskv",
 			"revision": "82aa063804cf055e16e8911250f888bc216e8b61",
 			"revisionTime": "2017-09-21T16:56:50Z"
-		},
-		{
-			"checksumSHA1": "+9V9fpksK1KLIUqYt1wpr1uiNxo=",
-			"path": "github.com/phayes/hookserve/hookserve",
-			"revision": "5688de3176153b9bae57e5dc246756f8b47680df",
-			"revisionTime": "2016-02-02T22:53:08Z"
 		},
 		{
 			"checksumSHA1": "rJab1YdNhQooDiBWNnt7TLWPyBU=",
@@ -1147,5 +1135,5 @@
 			"revisionTime": "2017-09-06T09:17:45Z"
 		}
 	],
-	"rootPath": "gitlab.com/sorenmat/ci-server"
+	"rootPath": "gitlab.com/sorenmat/seneferu"
 }
