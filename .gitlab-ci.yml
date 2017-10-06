@@ -2,8 +2,11 @@ image: golang:latest
 
 variables:
   DOCKER_HOST: tcp://localhost:2375
-  REPO_NAME: gitlab.com/sorenmat/ci-server
-# The problem is that to be able to use go get, one needs to put
+  REPO_NAME: gitlab.com/sorenmat/seneferu
+  CONTAINER_TEST_IMAGE: registry.gitlab.com/sorenmat/seneferu:$CI_COMMIT_REF_NAME
+  CONTAINER_RELEASE_IMAGE: registry.gitlab.com/sorenmat/seneferu:latest
+
+  # The problem is that to be able to use go get, one needs to put
 # the repository in the $GOPATH. So for example if your gitlab domain
 # is gitlab.com, and that your repository is namespace/project, and
 # the default GOPATH being /go, then you'd need to have your
@@ -13,19 +16,28 @@ before_script:
   - mkdir -p $GOPATH/src/$REPO_NAME
   - ln -svf $CI_PROJECT_DIR/* $GOPATH/src/$REPO_NAME
   - cd $GOPATH/src/$REPO_NAME
-
+  
 stages:
-    - test
+    - validate
     - build
-    - package
-    - deploy-job
+    - release
+
 format:
-    stage: test
+    stage: validate
     script:
       - go version
       - go fmt ./...
+vet:
+  stage: validate
+  script:
       - go vet ./...
-      - go test -race ./...
+
+test:
+  stage: validate
+  script:
+     - ls -la
+     - pwd
+     - go test -race ./...
 
 compile:
     stage: build
@@ -34,3 +46,13 @@ compile:
     artifacts:
       untracked: true
 
+
+release-image:
+  image: docker:latest
+  stage: release
+  script:
+    - docker pull $CONTAINER_TEST_IMAGE
+    - docker tag $CONTAINER_TEST_IMAGE $CONTAINER_RELEASE_IMAGE
+    - docker push $CONTAINER_RELEASE_IMAGE
+  only:
+    - master
