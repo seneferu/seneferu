@@ -107,8 +107,8 @@ func startWebServer(db *storm.DB, kubectl *kubernetes.Clientset, secret string) 
 	e.GET("/repo/:id/builds", handleFetchBuilds(db))
 	e.GET("/repo/:id/build/:buildid", handleFetchBuild(db))
 	e.GET("/helm/:release", handleHelm())
+	//e.GET("/ws/:repo/build/:buildid/:step", logStream)
 	e.GET("/ws", logStream)
-
 	// handle github web hook
 	e.Any("/webhook", func(c echo.Context) (err error) {
 		req := c.Request()
@@ -124,20 +124,31 @@ func startWebServer(db *storm.DB, kubectl *kubernetes.Clientset, secret string) 
 var sockets []*websocket.Conn
 
 func logStream(c echo.Context) error {
-	websocket.Handler(func(ws *websocket.Conn) {
+	/*	repo := c.Param("repo")
+		buildid := c.Param("buildid")
+		step := c.Param("step")
+	*/websocket.Handler(func(ws *websocket.Conn) {
+
 		defer ws.Close()
 		sockets = append(sockets, ws)
-		for {
+		/*		for {
 
-			// TODO is this needed ????
-			msg := ""
-			err := websocket.Message.Receive(ws, &msg)
-			if err != nil {
-				c.Logger().Error(err)
-			}
-			fmt.Printf("%s\n", msg)
+					// TODO is this needed ????
+					msg := ""
+					err := websocket.Message.Receive(ws, &msg)
+					if err != nil {
+						c.Logger().Error(err)
+					}
+					fmt.Printf("%s\n", msg)
 
+				}
+		*/
+		msg := ""
+		err := websocket.Message.Receive(ws, &msg)
+		if err != nil {
+			c.Logger().Error(err)
 		}
+		fmt.Printf("%s\n", msg)
 	}).ServeHTTP(c.Response(), c.Request())
 	return nil
 }

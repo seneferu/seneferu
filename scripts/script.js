@@ -120,11 +120,14 @@ function handleStepClick(step) {
 
         ws.onmessage = function (evt) {
             var ansi_up = new AnsiUp;
-            var html = ansi_up.ansi_to_html(JSON.parse(evt.data).Line);
-            var out = $('#output-log');
-            out.append('<div>' + html + '</div>');
-            var outputlog = $('.output-panelbody')
-            outputlog.scrollTop(outputlog[0].scrollHeight);
+            var msg = JSON.parse(evt.data)
+            if(msg.Step === step.name) {
+                var html = ansi_up.ansi_to_html(msg.Line);
+                var out = $('#output-log');
+                out.append('<div>' + html + '</div>');
+                var outputlog = $('.output-panelbody')
+                outputlog.scrollTop(outputlog[0].scrollHeight);
+            }
         }
     }
     output.show()
