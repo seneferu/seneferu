@@ -43,7 +43,7 @@ func main() {
 		log.Fatal("githubsecret can't be empty")
 	}
 	if *helmHost == "" {
-		*helmHost = os.Getenv("githubsecret")
+		*helmHost = os.Getenv("helmhost")
 	}
 	if *helmHost == "" {
 		log.Fatal("helmHost can't be empty")
