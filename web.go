@@ -122,25 +122,45 @@ func startWebServer(db *storm.DB, kubectl *kubernetes.Clientset, secret string, 
 	e.Start(":8080")
 }
 
-var sockets []*websocket.Conn
+var sockets = NewSockets()
+
+type Sockets struct {
+	Add     chan *websocket.Conn
+	Remove  chan *websocket.Conn
+	sockets []*websocket.Conn
+}
+
+func (s *Sockets) GetSockets() []*websocket.Conn {
+	return s.sockets
+}
+
+func (s *Sockets) handle() {
+	for {
+		select {
+		case add := <-s.Add:
+			s.sockets = append(s.sockets, add)
+		case remove := <-s.Remove:
+			for i, c := range s.sockets {
+				if c == remove {
+					s.sockets = append(s.sockets[:i], s.sockets[i+1:]...)
+				}
+			}
+		}
+	}
+}
+
+func NewSockets() *Sockets {
+	s := Sockets{}
+	s.Add = make(chan *websocket.Conn)
+	s.Remove = make(chan *websocket.Conn)
+
+	go s.handle()
+	return &s
+}
 
 func logStream(c echo.Context) error {
-	/*	repo := c.Param("repo")
-		buildid := c.Param("buildid")
-		step := c.Param("step")
-	*/websocket.Handler(func(ws *websocket.Conn) {
-
-		defer ws.Close()
-		sockets = append(sockets, ws)
-		for {
-
-			msg := ""
-			err := websocket.Message.Receive(ws, &msg)
-			if err != nil {
-				c.Logger().Error(err)
-			}
-			fmt.Printf("%s\n", msg)
-		}
+	websocket.Handler(func(ws *websocket.Conn) {
+		sockets.Add <- ws
 	}).ServeHTTP(c.Response(), c.Request())
 	return nil
 }

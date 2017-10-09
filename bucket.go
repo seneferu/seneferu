@@ -19,7 +19,7 @@ type Payload struct {
 
 func (b *BucketWriter) Write(p []byte) (n int, err error) {
 
-	for _, s := range sockets {
+	for _, s := range sockets.GetSockets() {
 		// Write
 		payload := Payload{Line: string(p), Step: b.Step}
 		d, err := json.Marshal(&payload)
@@ -28,7 +28,8 @@ func (b *BucketWriter) Write(p []byte) (n int, err error) {
 		}
 		err = websocket.Message.Send(s, string(d))
 		if err != nil {
-			fmt.Println("WS: ", err)
+			sockets.Remove <- s
+			fmt.Println("WS: Removed socket because of error: ", err)
 		}
 
 	}
