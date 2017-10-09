@@ -1,0 +1,45 @@
+
+.sidebar {
+    position:fixed;
+    top: 0; left: 0; bottom: 0;
+    border: 1px solid #666;
+    border-width: 0 1px 0 0;
+}
+
+.main { padding-top: 10px; }
+
+#repolist {
+    border: 1px solid #666;
+    border-width: 0 1px 0 0;
+    /*box-shadow: 2px 0 20px #333;*/
+}
+
+#repolist.collapsed {
+    width: 16.666%;
+}
+
+.sidebarlist.collapsed {
+    width: 16.66666%;
+}
+
+.sidebarlist.collapsed .listheader {
+    visibility: visible;
+    transform: rotate(90deg);
+}
+.sidebarlist.collapsed * {
+    visibility: hidden;
+}
+
+.builditem { border: 1px solid #333; border-width: 1px 0px;}
+
+.builditem .glyphicon {
+    margin-right: 7px;
+}
+
+.output-container {
+    padding: 20px;
+}
+
+.output-log {
+    font-family: "Courier New", Courier, monospace;
+}
