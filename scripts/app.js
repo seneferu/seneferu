@@ -29,6 +29,8 @@ Vue.component('build-list', {
         '</ul>',
     methods: {
         selectBuild: function(build){
+            this.builds.forEach((b) => b.selected = false);
+            build.selected = true;
             this.$emit('buildselected', build);
         }
     }
@@ -36,10 +38,14 @@ Vue.component('build-list', {
 
 Vue.component('build-item', {
     props: ['build'],
-    template: "<li class='builditem'><a v-on:click='selectBuild' v-bind:class='status_class(build)'>" +
-        '<span v-bind:class="[\'glyphicon\', status_icon(build)]"></span>' +
+    template: "<li class='builditem'>" +
+    '<a v-on:click="selectBuild" :class="[status_class(build), { active: isSelected }]">' +
+        '<span v-bind:class="[\'glyphicon\', status_icon(build) ]"></span>' +
         "<span>{{ time(build.timestamp) }}</span>" +
     "</a></li>",
+    computed: {
+        isSelected: function(){ return this.build.selected; }
+    },
     methods: {
         selectBuild: function(){
             this.$emit('buildselected', this.build);
@@ -95,7 +101,7 @@ Vue.component('pipeline-group', {
     props: ['step'],
     template: '<li class="build-group"><div class="build-header"></div>' +
                 '<ul class="jobs-container">' +
-                    '<li v-on:click="selectStep"><div class="job">' +
+                    '<li v-on:click="selectStep" :class="{active: step.selected}"><div class="job">' +
                         '<span v-bind:class="status_class(step)" aria-hidden="true"></span>' +
                     '<span>{{ step.name }}</span>' +
                 '</div></li></ul></li>',
@@ -124,6 +130,8 @@ Vue.component('pipeline', {
         '</ul></div>',
     methods: {
         selectStep: function(step){
+            this.pipeline.steps.forEach((s)=>s.selected = false);
+            step.selected = true;
             return this.$emit('step', step);
         }
     }
@@ -160,7 +168,10 @@ const buildStorage = {
         return $.ajax({
             url: '/repo/'+repoId,
             type: 'GET',
-            success: function(repo){ app.selectedRepo = repo },
+            success: function(repo){
+                repo.builds.forEach((b) => b.selected = false);
+                app.selectedRepo = repo;
+            },
             error: function(error){ app.error = error; }
         });
     },
@@ -168,7 +179,10 @@ const buildStorage = {
         return $.ajax({
             url: '/repo/'+repoId +"/build/"+buildId,
             type: 'GET',
-            success: function(buildInfo){ app.selectedBuild = buildInfo },
+            success: function(buildInfo){
+                buildInfo.steps.forEach((s) => s.selected = false);
+                app.selectedBuild = buildInfo
+            },
             error: function(error){ app.error = error; }
         });
     }
