@@ -36,6 +36,8 @@
     margin-right: 7px;
 }
 
+.builditem .active { background-color: #eee; }
+
 .output-container {
     padding: 20px;
 }

@@ -40,7 +40,7 @@
     width: 200px;
 }
 
-.pipeline .jobs-container > li:hover { 
+.pipeline .jobs-container > li:hover, .pipeline .jobs-container > li.active {
     background-color: #ccc;
     border-color: #666;
 }
