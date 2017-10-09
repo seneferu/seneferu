@@ -34,14 +34,13 @@
         </div>
     </div></div>
     <div class="col-xs-offset-3 col-xs-9 main">
-        <div class="row">
+        <div class="row" id="build-info">
             <div class="col-xs-12">
-                <pipeline v-if="selectedBuild" v-bind:pipeline="selectedBuild" v-on:step="showStep"></pipeline>
+                <build-info v-if="selectedBuild" v-bind:build="selectedBuild" v-on:step="showStep"></build-info>
             </div>
         </div>
         <div class="row">
             <div class="col-xs-12 output-container">
-                <h4>Build step output:</h4>
                 <console-output v-if="selectedStep.build" v-bind:build-output="selectedStep.build"></console-output>
                 <div v-if="!selectedStep.build">
                     SELECT A BUILD STEP TO SEE WHAT HAPPENS IN THERE :-O

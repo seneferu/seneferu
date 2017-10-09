@@ -69,6 +69,28 @@ Vue.component('build-item', {
     }
 });
 
+Vue.component('build-info', {
+    props: ['build'],
+    template: '<div>' +
+    '<div class="row"><div class="col-xs-12"> ' +
+    'Build Information: <br/>' +
+    '<pre>Build start: {{build.timestamp}} \n' +
+        'Test coverage: {{build.coverage}} \n' +
+        'Build took: {{build.took}}\n' +
+    '</pre>' +
+    '</div></div>' +
+    '<div class="row">' +
+    '<div class="col-xs-12">' +
+    '<pipeline v-if="build" v-bind:pipeline="build" v-on:step="selectStep"></pipeline>' +
+    '</div> </div>' +
+    '</div>',
+    methods: {
+        selectStep: function(step){
+            return this.$emit('step', step);
+        }
+    }
+});
+
 Vue.component('pipeline-group', {
     props: ['step'],
     template: '<li class="build-group"><div class="build-header"></div>' +
@@ -109,7 +131,10 @@ Vue.component('pipeline', {
 
 Vue.component('console-output', {
     props: ['buildOutput'],
-    template: '<div class="output-log" v-html="consolified(buildOutput)"></div>',
+    template: '<div>' +
+    '<h4>Build step output:</h4>' +
+    '<div class="output-log" v-html="consolified(buildOutput)"></div>' +
+    '</div>',
     methods: {
         consolified: function(input){
             var ansi_up = new AnsiUp;
@@ -157,8 +182,8 @@ document.addEventListener('DOMContentLoaded', function(){
             repos: [],
             buildInfo: {},
             selectedRepo: {},
-            selectedBuild: {},
-            selectedStep: {}
+            selectedBuild: undefined,
+            selectedStep: {build: undefined}
         },
         computed: {
             sortedRepoList: function(){
