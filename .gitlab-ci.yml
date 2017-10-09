@@ -1,9 +1,8 @@
 image: golang:latest
 
 variables:
-  DOCKER_HOST: tcp://localhost:2375
+#  DOCKER_HOST: tcp://localhost:2375
   REPO_NAME: gitlab.com/sorenmat/seneferu
-  CONTAINER_TEST_IMAGE: registry.gitlab.com/sorenmat/seneferu:$CI_COMMIT_REF_NAME
   CONTAINER_RELEASE_IMAGE: registry.gitlab.com/sorenmat/seneferu:latest
 
   # The problem is that to be able to use go get, one needs to put
@@ -42,19 +41,22 @@ test:
 compile:
     stage: build
     script:
-      - GOOS=linux CGO_ENABLED=0 go build -o $CI_PROJECT_DIR/ci-server
+      - GOOS=linux CGO_ENABLED=0 go build -o $CI_PROJECT_DIR/seneferu
     artifacts:
       untracked: true
 
 
 release-image:
   stage: release
-  image: docker:dind
+  image: docker:git
   services:
     - docker:dind
+  dependencies: 
+    - compile
   script:
-    - docker pull $CONTAINER_TEST_IMAGE
-    - docker tag $CONTAINER_TEST_IMAGE $CONTAINER_RELEASE_IMAGE
-    - docker push $CONTAINER_RELEASE_IMAGE
-  only:
-    - master
+    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN registry.gitlab.com
+    - docker version
+    - cd $CI_PROJECT_DIR
+    - docker build -t registry.gitlab.com/sorenmat/seneferu:$CI_COMMIT_REF_NAME .
+    - docker push registry.gitlab.com/sorenmat/seneferu:$CI_COMMIT_REF_NAME
+
