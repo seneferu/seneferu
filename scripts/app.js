@@ -44,7 +44,7 @@ Vue.component('build-item', {
         "<span>{{ time(build.timestamp) }}</span>" +
     "</a></li>",
     computed: {
-        isSelected: function(){ return this.build.selected; }
+        isSelected: function(){ return this.build.selected; }
     },
     methods: {
         selectBuild: function(){
@@ -113,7 +113,10 @@ Vue.component('pipeline-group', {
             if(step.status == "Done" && step.exitcode == 0){
                 text_color = 'text-success';
                 icon = 'glyphicon-ok';
-            }
+            } else {
+				text_color = 'text-muted';
+				icon = 'glyphicon-hourglass';
+			}
 
             return ['glyphicon', icon, text_color]
         },
@@ -158,7 +161,7 @@ const repoStorage = {
             url: '/repos',
             type: 'GET',
             success: function(repos){ app.repos = repos; },
-            error: function(error){ app.error = error; }
+            error: function(error){ app.error = error; }
         });
     }
 };
@@ -172,7 +175,7 @@ const buildStorage = {
                 repo.builds.forEach((b) => b.selected = false);
                 app.selectedRepo = repo;
             },
-            error: function(error){ app.error = error; }
+            error: function(error){ app.error = error; }
         });
     },
     fetch: function(app, repoId, buildId){
@@ -183,7 +186,7 @@ const buildStorage = {
                 buildInfo.steps.forEach((s) => s.selected = false);
                 app.selectedBuild = buildInfo
             },
-            error: function(error){ app.error = error; }
+            error: function(error){ app.error = error; }
         });
     }
 };
