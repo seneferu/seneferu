@@ -110,9 +110,11 @@ Vue.component('pipeline-group', {
             var icon = 'glyphicon-remove';
             var text_color = 'text-danger';
 
-            if(step.status == "Done" && step.exitcode == 0){
-                text_color = 'text-success';
-                icon = 'glyphicon-ok';
+            if(step.status == "Done") {
+            	if (step.exitcode == 0) {
+					text_color = 'text-success';
+					icon = 'glyphicon-ok';
+				}
             } else {
 				text_color = 'text-muted';
 				icon = 'glyphicon-hourglass';
