@@ -66,13 +66,13 @@ func main() {
 func startWeb(config *rest.Config) {
 	db, err := storm.Open("my.db")
 	if err != nil {
-		log.Fatal("unable to load db")
+		log.Fatal("unable to load db", err)
 	}
 	defer db.Close()
 
 	kubectl, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		panic(err.Error())
+		log.Fatal(errors.Wrap(err, "unable create kubectl"))
 	}
 	startWebServer(db, kubectl, *githubSecret, *helmHost)
 }
