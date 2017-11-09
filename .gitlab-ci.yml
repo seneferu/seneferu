@@ -1,4 +1,6 @@
 image: golang:latest
+services:
+  - postgres:latest
 
 variables:
 #  DOCKER_HOST: tcp://localhost:2375
