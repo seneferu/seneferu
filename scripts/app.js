@@ -1,48 +1,17 @@
 
-Vue.component('repo-list',{
-    props: ['repos'],
-    template: '<ul class="nav">' +
-            '<repo-item v-for="repo in repos" v-bind:repo="repo" v-bind:key="repo.id" v-on:reposelected="selectRepo"></repo-item>' +
-            '</ul>',
-    methods: {
-        selectRepo: function(repo){
-            this.$emit('reposelected', repo)
-        }
-    }
-});
-
 Vue.component('repo-item', {
     props: ['repo'],
-    template: "<li><div><a v-on:click='selectRepo'>{{ repo.id }}</a></div></li>",
+    template: "#repo-item",
     methods: {
         selectRepo: function(){
             this.$emit('reposelected', this.repo)
-        }
-    }
-
-});
-
-Vue.component('build-list', {
-    props: ['builds'],
-    template: '<ul class="nav">' +
-        '<build-item v-for="build in builds" v-bind:build="build" v-bind:key="build.id" v-on:buildselected="selectBuild"></build-item>' +
-        '</ul>',
-    methods: {
-        selectBuild: function(build){
-            this.builds.forEach((b) => b.selected = false);
-            build.selected = true;
-            this.$emit('buildselected', build);
         }
     }
 });
 
 Vue.component('build-item', {
     props: ['build'],
-    template: "<li class='builditem'>" +
-    '<a v-on:click="selectBuild" :class="[status_class(build), { active: isSelected }]">' +
-        '<span v-bind:class="[\'glyphicon\', status_icon(build) ]"></span>' +
-        "<span>{{ time(build.timestamp) }}</span>" +
-    "</a></li>",
+    template: "#build-item",
     computed: {
         isSelected: function(){ return this.build.selected; }
     },
@@ -152,46 +121,46 @@ Vue.component('console-output', {
     }
 });
 
-const repoStorage = {
-    fetchAll: function(app){
-        return $.ajax({
-            url: '/repos',
-            type: 'GET',
-            success: function(repos){ app.repos = repos; },
-            error: function(error){ app.error = error; }
-        });
-    }
-};
+const api = {
+    _success: function(cb){return (val) => cb(undefined, val) },
+    _fail: function(cb){return (err) => cb(err, undefined) },
 
-const buildStorage = {
-    fetchAll: function(app, repoId){
-        console.log('fetchall ',repoId.id)
+    repos: function(cb){
         return $.ajax({
-            url: '/repo/'+repoId.id+'/builds',
-            type: 'GET',
-            success: function(builds){
-                console.log('Builds: ',builds)
-                builds.forEach((b) => b.selected = false);
-                app.selectedRepo = repoId;
-                app.builds = builds
-            },
-            error: function(error){ app.error = error; }
+            url: "/repos",
+            type: "GET",
+            success: api._success(cb),
+            error: api._fail(cb)
         });
     },
-    fetch: function(app, repoId, buildId){
+    builds: function(cb, repoId){
         return $.ajax({
-            url: '/repo/'+repoId +"/build/"+buildId,
-            type: 'GET',
-            success: function(buildInfo){
-                buildInfo.steps.forEach((s) => s.selected = false);
-                app.selectedBuild = buildInfo
-            },
-            error: function(error){ app.error = error; }
+            url: "/repo/"+repoId+"/builds",
+            type: "GET",
+            success: api._success(cb),
+            error: api._fail(cb)
+        });
+    },
+    build: function(cb, repoId, buildId){
+        return $.ajax({
+            url: "/repo/"+repoId+"/build/"+buildId,
+            type: "GET",
+            success: api._success(cb),
+            error: api._fail(cb)
         });
     }
 };
 
+function cbWrap(errFn, fn){
+    return function(err, val){
+        if(err){ return errFn(err); }
+        return fn(val);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function(){
+    var wrapWrap = cbWrap.bind(undefined, [function(err){ app.error = err; }]);
+
     var app = new Vue({
         el: "#app",
         data: {
@@ -208,13 +177,6 @@ document.addEventListener('DOMContentLoaded', function(){
                 return this.repoList.sort();
             },
             sortedBuilds: function(){
-                /*console.log('crap !!!!!!!!!')
-                console.log(this.builds)
-                console.log('crap !!!!!!!##!')
-                if(this.build === undefined) { return []; }
-                if(!this.builds){ return []; }
-                return this.builds.sort(function(a,b){return a.timestamp < b.timestamp;})
-                */
                 return this.builds
             }
         },
@@ -236,10 +198,18 @@ document.addEventListener('DOMContentLoaded', function(){
                 }
             },
             getBuildList: function(repo) {
-                buildStorage.fetchAll(this, this.selectedRepo);
+                api.builds(wrapWrap(function(builds){
+                    builds.forEach((b) => b.selected = false);
+                    app.builds = builds
+                }), repo.id);
             },
             getBuild : function(build){
-                buildStorage.fetch(this, this.selectedRepo, this.selectedBuild.number);
+                api.build(wrapWrap(function(build){
+                    build.steps.forEach((s) => s.selected = false);
+                    app.selectedBuild = build;
+
+                }), this.selectedRepo.id, build.id)
+                //buildStorage.fetch(this, this.selectedRepo, this.selectedBuild.number);
                 // Do something setup
             },
             setupWebSocket: function(step){
@@ -258,5 +228,5 @@ document.addEventListener('DOMContentLoaded', function(){
             }
         }
     });
-    repoStorage.fetchAll(app);
+    api.repos(wrapWrap((val) => app.repos = val));
 });
