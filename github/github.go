@@ -13,8 +13,8 @@ import (
 const configfilename = ".ci.yaml"
 
 // GetConfigFile tries to fetch the .ci.yaml file from the github repository
-func GetConfigFile(owner, repo, commit string) ([]byte, error) {
-	j, err := fetchConfigFromGithub(owner, repo, commit)
+func GetConfigFile(repo, commit string) ([]byte, error) {
+	j, err := fetchConfigFromGithub(repo, commit)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to binary data")
 	}
@@ -76,9 +76,9 @@ func parseGithubTree(j []byte) (string, error) {
 	return "", fmt.Errorf("unable to find URL to .ci.yaml file in repository")
 }
 
-func fetchConfigFromGithub(owner, repo, commit string) ([]byte, error) {
+func fetchConfigFromGithub(repo, commit string) ([]byte, error) {
 	client := getHTTPSClient()
-	url := fmt.Sprintf("https://api.github.com/repos/%v/%v/git/trees/%v", owner, repo, commit)
+	url := fmt.Sprintf("https://api.github.com/repos/%v/git/trees/%v", repo, commit)
 	fmt.Println("About to fetch: ", url)
 	resp, err := client.Get(url)
 	if err != nil {

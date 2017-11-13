@@ -13,7 +13,7 @@ Vue.component('repo-list',{
 
 Vue.component('repo-item', {
     props: ['repo'],
-    template: "<li><div><a v-on:click='selectRepo'>{{ repo.name }}</a></div></li>",
+    template: "<li><div><a v-on:click='selectRepo'>{{ repo.id }}</a></div></li>",
     methods: {
         selectRepo: function(){
             this.$emit('reposelected', this.repo)
@@ -165,12 +165,15 @@ const repoStorage = {
 
 const buildStorage = {
     fetchAll: function(app, repoId){
+        console.log('fetchall ',repoId.id)
         return $.ajax({
-            url: '/repo/'+repoId,
+            url: '/repo/'+repoId.id+'/builds',
             type: 'GET',
-            success: function(repo){
-                repo.builds.forEach((b) => b.selected = false);
-                app.selectedRepo = repo;
+            success: function(builds){
+                console.log('Builds: ',builds)
+                builds.forEach((b) => b.selected = false);
+                app.selectedRepo = repoId;
+                app.builds = builds
             },
             error: function(error){ app.error = error; }
         });
@@ -195,7 +198,8 @@ document.addEventListener('DOMContentLoaded', function(){
             repoSearch: '',
             repos: [],
             buildInfo: {},
-            selectedRepo: {},
+            builds: {},
+            selectedRepo: [],
             selectedBuild: undefined,
             selectedStep: {build: undefined}
         },
@@ -204,8 +208,14 @@ document.addEventListener('DOMContentLoaded', function(){
                 return this.repoList.sort();
             },
             sortedBuilds: function(){
-                if(!this.selectedRepo.builds){ return []; }
-                return this.selectedRepo.builds.sort(function(a,b){return a.timestamp < b.timestamp;})
+                /*console.log('crap !!!!!!!!!')
+                console.log(this.builds)
+                console.log('crap !!!!!!!##!')
+                if(this.build === undefined) { return []; }
+                if(!this.builds){ return []; }
+                return this.builds.sort(function(a,b){return a.timestamp < b.timestamp;})
+                */
+                return this.builds
             }
         },
         methods: {
@@ -226,10 +236,10 @@ document.addEventListener('DOMContentLoaded', function(){
                 }
             },
             getBuildList: function(repo) {
-                buildStorage.fetchAll(this, this.selectedRepo.id);
+                buildStorage.fetchAll(this, this.selectedRepo);
             },
             getBuild : function(build){
-                buildStorage.fetch(this, this.selectedRepo.id, this.selectedBuild.number);
+                buildStorage.fetch(this, this.selectedRepo, this.selectedBuild.number);
                 // Do something setup
             },
             setupWebSocket: function(step){
