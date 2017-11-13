@@ -10,6 +10,12 @@
 			"revisionTime": "2017-06-23T02:34:00Z"
 		},
 		{
+			"checksumSHA1": "ixDTL1EaaHh9wVq5+CKNj3J985o=",
+			"path": "github.com/DavidHuie/gomigrate",
+			"revision": "4004e6142040f5d622e9d2be6e833a4652741571",
+			"revisionTime": "2016-08-09T00:10:28Z"
+		},
+		{
 			"checksumSHA1": "26NB7gJ3/G/DjEKirkcfcxZS+9s=",
 			"origin": "k8s.io/helm/vendor/github.com/Masterminds/semver",
 			"path": "github.com/Masterminds/semver",
@@ -384,6 +390,18 @@
 			"path": "github.com/labstack/gommon/log",
 			"revision": "57409ada9da0f2afad6664c49502f8c50fbd8476",
 			"revisionTime": "2017-09-25T05:28:17Z"
+		},
+		{
+			"checksumSHA1": "88ochAZ1SsbAH6DgBQ5eTUChFE0=",
+			"path": "github.com/lib/pq",
+			"revision": "ae8357db35d721c58dcdc911318b55bef6b1b001",
+			"revisionTime": "2016-10-14T01:16:34Z"
+		},
+		{
+			"checksumSHA1": "xppHi82MLqVx1eyQmbhTesAEjx8=",
+			"path": "github.com/lib/pq/oid",
+			"revision": "ae8357db35d721c58dcdc911318b55bef6b1b001",
+			"revisionTime": "2016-10-14T01:16:34Z"
 		},
 		{
 			"checksumSHA1": "T8soMJArSZrYnhmdpAnq1bVxQ6Q=",

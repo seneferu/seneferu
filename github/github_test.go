@@ -14,7 +14,7 @@ import (
 )
 
 func TestPayload(t *testing.T) {
-	req, err := http.NewRequest("POST", "http://localhost:8080/webhook?access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0ZXh0IjoiVHJhZGVzaGlmdC90cnVlYm4tZ2FiYnkiLCJ0eXBlIjoiaG9vayJ9.ev_sUvp7lE4NtXFIMTkR7qf7lw0zK9IH3ZdBNtSvJTI", bytes.NewBufferString(payload2))
+	req, err := http.NewRequest("POST", "http://localhost:8080/webhook?access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0ZXh0IjoiVHJhZGVzaGlmdC90cnVlYm4tZ2FiYnkiLCJ0eXBlIjoiaG9vayJ9.ev_sUvp7lE4NtXFIMTkR7qf7lw0zK9IH3ZdBNtSvJTI", bytes.NewBufferString(payload))
 	if err != nil {
 		t.Error(err)
 	}
@@ -24,7 +24,7 @@ func TestPayload(t *testing.T) {
 	req.Header.Set("X-GitHub-Event", "push")
 
 	hashing := hmac.New(sha12.New, []byte("supersecretpassword..nice"))
-	hashing.Write([]byte(payload2))
+	hashing.Write([]byte(payload))
 	req.Header.Set("X-Hub-Signature", "sha1="+hex.EncodeToString(hashing.Sum(nil)))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
