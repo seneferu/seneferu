@@ -6,8 +6,6 @@ ADD scripts/ scripts
 ADD images/ images
 ADD styles/ styles
 ADD index.html index.html
-ADD index_new.html index_new.html
-
 
 ADD seneferu /seneferu
 ENTRYPOINT ["/seneferu"]
