@@ -2,4 +2,4 @@
 replicaCount: 1
 image:
   tag: latest
-  name: sorenmat/ci-server
+  name: sorenmat/seneferu

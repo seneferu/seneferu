@@ -1,5 +1,0 @@
-apiVersion: v1
-description: CI server
-name: ci-server
-version: 0.1.0
-
