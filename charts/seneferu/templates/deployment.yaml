@@ -1,7 +1,7 @@
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  name: ci-server
+  name: seneferu
   labels:
     chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
   annotations:
@@ -14,7 +14,7 @@ spec:
   template:
     metadata:
       labels:
-        service: ci-server
+        service: seneferu
       annotations:
         # add random string, to force re-start of pods.
         random-string: {{ randAlphaNum 15 }}
@@ -22,22 +22,22 @@ spec:
       containers:
       - envFrom:
         - configMapRef:
-            name: {{ .Release.Name }}-ci-server-env-config
+            name: {{ .Release.Name }}-seneferu-env-config
         image: {{ .Values.image.name }}:{{ .Values.image.tag }}
         imagePullPolicy: Always
-        name: ci-server
+        name: seneferu
       restartPolicy: Always
 ---
 apiVersion: v1
 kind: Service
 metadata:
   labels:
-    service: ci-server
-  name: ci-server
+    service: seneferu
+  name: seneferu
 spec:
   type: LoadBalancer
   ports:
   - name: http
     port: 8080
   selector:
-    service: ci-server
+    service: seneferu

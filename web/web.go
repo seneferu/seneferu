@@ -97,7 +97,6 @@ func StartWebServer(db storage.Service, kubectl *kubernetes.Clientset, secret st
 	e.Static("/scripts", "scripts")
 	e.Static("/images", "images")
 	e.File("/", "index.html")
-	e.File("/v2", "index_new.html")
 	e.GET("/status", handleStatus())
 	e.GET("/repos", handleFetchRepos(db))
 	e.GET("/repo/:org/:id", handleFetchRepoData(db))
