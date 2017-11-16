@@ -5,6 +5,8 @@ MAINTAINER Søren Mathiasen <sorenm@mymessages.dk>
 ADD scripts/ scripts
 ADD images/ images
 ADD styles/ styles
+ADD migrations/ migrations
+
 ADD index.html index.html
 
 ADD seneferu /seneferu
