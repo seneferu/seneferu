@@ -44,13 +44,14 @@ func main() {
 	} else {
 		log.Println("Seems like we are running in a Kubernetes cluster!!")
 	}
-	fmt.Println("Starting web server...")
 
 	service, err := sql.New()
 
+	fmt.Println("Setting up Kubernets access")
 	kubectl, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		log.Fatal(errors.Wrap(err, "unable create kubectl"))
 	}
+	fmt.Println("Starting web server...")
 	web.StartWebServer(service, kubectl, *githubSecret, *helmHost)
 }

@@ -27,7 +27,7 @@ func New() (storage.Service, error) {
 		host = os.Getenv("POSTGRES_HOST")
 	}
 
-	db, err := sql.Open("postgres", "host="+host+" user=postgres dbname=seneferu sslmode=disable")
+	db, err := sql.Open("postgres", "host="+host+" user=postgres password=postgres dbname=seneferu sslmode=disable")
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to load db")
 	}
