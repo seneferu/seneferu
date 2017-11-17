@@ -26,11 +26,15 @@
     <div class="col-xs-3 sidebar"><div class="row">
         <div id="repolist" class="col-xs-10 sidebarlist">
             <h2 class="listheader">REPOSITORIES</h2>
-            <repo-list v-bind:repos="repos" v-on:reposelected="selectRepo"></repo-list>
+            <ul class="nav">
+                <repo-item v-for="repo in repos" v-bind:repo="repo" v-bind:key="repo.id" v-on:reposelected="selectRepo"></repo-item>
+            </ul>
         </div>
         <div id="buildlist" class="col-xs-10 sidebarlist collapsed">
             <h3 class="listheader">BUILDS</h3>
-            <build-list v-bind:builds="sortedBuilds" v-on:buildselected="selectBuild"></build-list>
+            <ul class="nav">
+                <build-item v-for="build in builds" v-bind:build="build" v-bind:key="build.id" v-on:buildselected="selectBuild"></build-item>
+            </ul>
         </div>
     </div></div>
     <div class="col-xs-offset-3 col-xs-9 main">
@@ -69,6 +73,25 @@ $(document).ready(function(){
     });
 })
 </script>
+
+<script type="text/x-template" id="application">
+
+</script>
+<script type="text/x-template" id="repo-item">
+    <li><div><a v-on:click='selectRepo'>{{ repo.id }}</a></div></li>
+</script>
+<script type="text/x-template" id="build-item">
+    <li class='builditem'>
+        <a v-on:click="selectBuild" :class="[status_class(build), { active: isSelected }]">
+            <span v-bind:class="['glyphicon', status_icon(build) ]"></span>
+            <span>{{ time(build.timestamp) }}</span>
+        </a>
+    </li>
+</script>
+<script type="text/x-template" id="">
+
+</script>
+
 <script src="/scripts/app.js"></script>
 </body>
 </html>
