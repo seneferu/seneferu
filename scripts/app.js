@@ -159,7 +159,7 @@ function cbWrap(errFn, fn){
 }
 
 document.addEventListener('DOMContentLoaded', function(){
-    var wrapWrap = cbWrap.bind(undefined, [function(err){ app.error = err; }]);
+    var wrapWrap = cbWrap.bind(undefined, function(err){ app.error(err); });
 
     var app = new Vue({
         el: "#app",
@@ -225,6 +225,10 @@ document.addEventListener('DOMContentLoaded', function(){
                     }
                     console.log(evt);
                 }
+            },
+            error: function(err){
+                console.log(err);
+                // Add some actual showing of error
             }
         }
     });
