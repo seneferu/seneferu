@@ -4,10 +4,11 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
-	"github.com/bmatsuo/go-jsontree"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/bmatsuo/go-jsontree"
+	"github.com/pkg/errors"
 )
 
 const configfilename = ".ci.yaml"
@@ -23,7 +24,14 @@ func GetConfigFile(org, repo, commit, token string) ([]byte, error) {
 		return nil, errors.Wrap(err, "unable fetch url")
 	}
 	client := getHTTPSClient()
-	resp, err := client.Get(url)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to create request to github")
+	}
+	req.SetBasicAuth("", token)
+	resp, err := client.Do(req)
+
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to read body")
 	}
@@ -78,9 +86,15 @@ func parseGithubTree(j []byte) (string, error) {
 
 func fetchConfigFromGithub(org, repo, commit, token string) ([]byte, error) {
 	client := getHTTPSClient()
-	url := fmt.Sprintf("https://"+token+"@api.github.com/repos/%v/%v/git/trees/%v", org, repo, commit)
+	url := fmt.Sprintf("https://api.github.com/repos/%v/%v/git/trees/%v", org, repo, commit)
 	fmt.Println("About to fetch: ", url)
-	resp, err := client.Get(url)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to create request to github")
+	}
+	req.SetBasicAuth("", token)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch file from github")
 	}
@@ -89,6 +103,7 @@ func fetchConfigFromGithub(org, repo, commit, token string) ([]byte, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to read body from response")
 	}
+
 	return j, nil
 }
 
