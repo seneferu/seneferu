@@ -34,7 +34,7 @@ func TestDoneCmd(t *testing.T) {
 }
 
 func TestCreateBuild(t *testing.T) {
-	build := &model.Build{Number: 1, Owner: "sorenmat", Repo: "ci-server"}
+	build := &model.Build{Number: 1, Name: "sorenmat", Org: "ci-server"}
 	container := &yaml.Container{Environment: map[string]string{"Name": "sorenmat"}}
 	cfg := &yaml.Config{}
 	cfg.Pipeline.Containers = append(cfg.Pipeline.Containers, container)

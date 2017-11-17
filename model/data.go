@@ -5,34 +5,42 @@ import (
 )
 
 type Build struct {
-	Number     int        `json:"number" storm:"id"`
+	Org  string `json:"organisation"`
+	Name string `json:"name"`
+
+	Number     int        `json:"number"`
 	Committers []string   `json:"committers"`
 	Timestamp  time.Time  `json:"timestamp"`
 	Success    bool       `json:"success"`
 	Status     string     `json:"status"`
 	Steps      []*Step    `json:"steps"`
 	Services   []*Service `json:"services"`
-	Repo       string     `json:"repository"`
-	Owner      string     `json:"owner"`
 	Commit     string     `json:"commit"`
 	Coverage   string     `json:"coverage"`
-	Took       string     `json:"took"`
+	Duration   string     `json:"duration"`
 }
 
-type Step struct {
-	BuildNumber int    `storm:"id"`
-	Repo        string `storm:"index"`
+type StepInfo struct {
+	BuildNumber int    `json:"buildnumber"`
+	Org         string `json:"org"`
+	Reponame    string `json:"reponame"`
 	Name        string `json:"name"`
-	Log         string `json:"build"`
 	Status      string `json:"status"`
 	ExitCode    int32  `json:"exitcode"`
 }
+
+type Step struct {
+	StepInfo
+	Log string `json:"build"`
+}
+
 type Service struct {
 	Name string `json:"name"`
 	Log  string `json:"build"`
 }
+
 type Repo struct {
-	Id   string `json:"id" storm:"id"`
+	Org  string `json:"org"`
 	Name string `json:"name"`
 	Url  string `json:"url"`
 }

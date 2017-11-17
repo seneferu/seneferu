@@ -50,14 +50,11 @@ func HandlePush(service storage.Service, kubectl *kubernetes.Clientset) webhooks
 
 		pl := payload.(github.PushPayload)
 
-		name := pl.Repository.Name
-		id := fmt.Sprintf("%v/%v", pl.Repository.Owner.Name, pl.Repository.Name)
-
-		repo, err := service.LoadById(name)
+		repo, err := service.LoadByOrgAndName(pl.Repository.Owner.Name, pl.Repository.Name)
 		if err != nil {
 			repo = &model.Repo{
-				Name: name,
-				Id:   id,
+				Org:  pl.Repository.Owner.Name,
+				Name: pl.Repository.Name,
 			}
 			// this is odd move to a save function
 			err = service.SaveRepo(repo)
@@ -66,8 +63,8 @@ func HandlePush(service storage.Service, kubectl *kubernetes.Clientset) webhooks
 			}
 		}
 		build := &model.Build{
-			Repo:       id,
-			Owner:      pl.Repository.Owner.Name,
+			Org:        pl.Repository.Owner.Name,
+			Name:       pl.Repository.Name,
 			Commit:     pl.HeadCommit.ID,
 			Committers: []string{pl.Pusher.Name},
 			Status:     "Created",
@@ -179,7 +176,7 @@ func handleFetchBuilds(db storage.Service) echo.HandlerFunc {
 		}
 		log.Printf("Fetching builds for repo id: %v", id)
 
-		builds, err := db.LoadBuilds(org + "/" + id)
+		builds, err := db.LoadBuilds(org, id)
 		if err != nil {
 			return err
 		}
@@ -193,7 +190,7 @@ func handleFetchRepoData(db storage.Service) echo.HandlerFunc {
 		org := c.Param("org")
 		id := c.Param("id")
 		fmt.Printf("Id: %v,Org: %v\n", id, org)
-		repo, err := db.LoadById(org + "/" + id)
+		repo, err := db.LoadByOrgAndName(org, id)
 		if err != nil {
 			c.Error(err)
 			return err
@@ -239,7 +236,9 @@ func handleHelm(host string) echo.HandlerFunc {
 
 func handleFetchBuild(db storage.Service) echo.HandlerFunc {
 	return func(c echo.Context) error {
+		org := c.Param("org")
 		id := c.Param("id")
+		fmt.Printf("Id: %v,Org: %v\n", id, org)
 		buildidStr := c.Param("buildid")
 
 		buildid, err := strconv.Atoi(buildidStr)
@@ -247,7 +246,7 @@ func handleFetchBuild(db storage.Service) echo.HandlerFunc {
 			return err
 		}
 
-		b, err := db.LoadBuild(id, buildid)
+		b, err := db.LoadStepInfos(org, id, buildid)
 		if err != nil {
 			return err
 		}

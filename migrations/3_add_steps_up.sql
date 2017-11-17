@@ -1,7 +1,8 @@
 CREATE TABLE steps (
   uid         SERIAL PRIMARY KEY,
   buildnumber INTEGER,
-  repo        VARCHAR,
+  org         VARCHAR,
+  reponame    VARCHAR,
   name        VARCHAR,
   log         TEXT,
   status      VARCHAR,
@@ -9,9 +10,9 @@ CREATE TABLE steps (
   --CONSTRAINT FK_buildnumber FOREIGN KEY (buildnumber)
   --REFERENCES builds (uid),
 
-  CONSTRAINT FK_repos FOREIGN KEY (repo)
-  REFERENCES repositories (id),
+  --CONSTRAINT FK_repos FOREIGN KEY (repo)
+  --REFERENCES repositories (id),
 
   CONSTRAINT step_uq
-  UNIQUE (buildnumber, repo, name)
+  UNIQUE (buildnumber, reponame, name, org)
 );

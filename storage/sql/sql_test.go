@@ -14,16 +14,18 @@ func TestSaveAndLoadRepo(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	s := "test-" + uuid.New()
-	repo := &model.Repo{Id: s, Name: "Apple Jack", Url: "www.applejack.io"}
-	service.SaveRepo(repo)
+	org := "Seneferu"
+	name := "coderepo"
+	repo := &model.Repo{Org: org, Name: name, Url: "www.applejack.io"}
+	err = service.SaveRepo(repo)
+	assert.NoError(t, err)
 
-	loadedRepo, err := service.LoadById(s)
+	loadedRepo, err := service.LoadByOrgAndName(org, name)
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, repo.Id, loadedRepo.Id)
-	assert.Equal(t, "Apple Jack", loadedRepo.Name)
+	assert.Equal(t, repo.Org, loadedRepo.Org)
+	assert.Equal(t, name, loadedRepo.Name)
 
 }
 
@@ -33,13 +35,19 @@ func TestSaveAndLoadAllBuilds(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	repo := &model.Repo{Id: "test"}
-	b := &model.Build{Repo: "test", Number: 1, Status: "Running"}
+	org := "Seneferu"
+	name := "coderepo-" + uuid.New()
+	repo := &model.Repo{Org: org, Name: name, Url: "www.applejack.io"}
 
-	service.SaveRepo(repo)
-	service.SaveBuild(b)
+	b := &model.Build{Org: org, Name: name, Number: 1, Status: "Running"}
 
-	loadedRepo, err := service.LoadBuilds("test")
+	err = service.SaveRepo(repo)
+	assert.NoError(t, err)
+
+	err = service.SaveBuild(b)
+	assert.NoError(t, err)
+
+	loadedRepo, err := service.LoadBuilds(org, name)
 	if err != nil {
 		t.Error(err)
 	}
@@ -60,23 +68,25 @@ func TestSaveAndLoadBuild(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	repo := &model.Repo{Id: "test"}
+	org := "Seneferu"
+	name := "repo1"
+	repo := &model.Repo{Org: org, Name: name}
 	service.SaveRepo(repo)
 
-	loadedRepo, err := service.LoadById("test")
+	loadedRepo, err := service.LoadByOrgAndName(org, name)
 	if err != nil {
 		t.Error(err)
 	}
-	if loadedRepo.Id != "test" {
+	if loadedRepo.Org != org {
 		t.Error("should have loaded the correct repo")
 	}
-	build := &model.Build{Repo: "test", Number: 2, Owner: "me"}
+	build := &model.Build{Org: org, Name: name, Number: 2}
 	err = service.SaveBuild(build)
 	if err != nil {
 		t.Error(err)
 	}
 
-	loadedBuild, err := service.LoadBuild("test", 2)
+	loadedBuild, err := service.LoadBuild(org, name, 2)
 	if err != nil {
 		t.Error(err)
 	}
@@ -91,17 +101,18 @@ func TestSaveBuildMultipleTimes(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	repoName := "test" + uuid.New()
-	repo := &model.Repo{Id: repoName}
+	org := "Seneferu"
+	name := "repo-" + uuid.New()
+	repo := &model.Repo{Org: org, Name: name}
 	service.SaveRepo(repo)
 
-	build := &model.Build{Repo: repoName, Number: 2, Owner: "me"}
+	build := &model.Build{Org: org, Name: name, Number: 2}
 	err = service.SaveBuild(build)
 	assert.NoError(t, err)
 	err = service.SaveBuild(build)
 	assert.NoError(t, err)
 
-	loadedBuild, err := service.LoadBuilds(repoName)
+	loadedBuild, err := service.LoadBuilds(org, name)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 1, len(loadedBuild))
@@ -112,27 +123,66 @@ func TestSaveAndLoadStep(t *testing.T) {
 	defer service.Close()
 	assert.NoError(t, err)
 
-	repoID := "test" + uuid.New()
-	repo := &model.Repo{Id: repoID}
-	service.SaveRepo(repo)
+	org := "Seneferu"
+	name := "repo-" + uuid.New()
+	repo := &model.Repo{Org: org, Name: name}
 
-	loadedRepo, err := service.LoadById(repoID)
+	err = service.SaveRepo(repo)
 	assert.NoError(t, err)
 
-	assert.Equal(t, repoID, loadedRepo.Id)
-	build := &model.Build{Repo: repoID, Number: 2, Owner: "me"}
+	loadedRepo, err := service.LoadByOrgAndName(org, name)
+	assert.NoError(t, err)
+
+	assert.Equal(t, org, loadedRepo.Org)
+	assert.Equal(t, name, loadedRepo.Name)
+
+	build := &model.Build{Org: org, Name: name, Number: 1}
 	err = service.SaveBuild(build)
 	assert.NoError(t, err)
 
-	loadedBuild, err := service.LoadBuild(repoID, 2)
+	loadedBuild, err := service.LoadBuild(org, name, 1)
 	assert.NoError(t, err)
-	assert.Equal(t, 2, loadedBuild.Number)
+	assert.Equal(t, 1, loadedBuild.Number)
 
-	step := &model.Step{Repo: repoID, BuildNumber: 2, Name: "git"}
+	step := &model.Step{StepInfo: model.StepInfo{Org: org, Reponame: name, BuildNumber: 1, Name: "git"}}
 	err = service.SaveStep(step)
 	assert.NoError(t, err)
 
-	loadedStep, err := service.LoadStep(repoID, 2, "git")
+	loadedStep, err := service.LoadStep(org, name, 1, "git")
+	assert.NoError(t, err)
+	assert.Equal(t, 1, loadedStep.BuildNumber)
+	assert.Equal(t, org, loadedStep.Org)
+	assert.Equal(t, name, loadedStep.Reponame)
+	assert.Equal(t, "git", loadedStep.Name)
+}
+
+func TestSaveAndLoadStepInfo(t *testing.T) {
+	service, err := New()
+	defer service.Close()
+	assert.NoError(t, err)
+
+	org := "Seneferu"
+	name := "repo-" + uuid.New()
+	repo := &model.Repo{Org: org, Name: name}
+	service.SaveRepo(repo)
+
+	loadedRepo, err := service.LoadByOrgAndName(org, name)
+	assert.NoError(t, err)
+
+	assert.Equal(t, org, loadedRepo.Org)
+	build := &model.Build{Org: org, Name: name, Number: 1}
+	err = service.SaveBuild(build)
+	assert.NoError(t, err)
+
+	loadedBuild, err := service.LoadBuild(org, name, 1)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, loadedBuild.Number)
+
+	step := &model.Step{StepInfo: model.StepInfo{Org: org, Reponame: name, BuildNumber: 2, Name: "git"}}
+	err = service.SaveStep(step)
+	assert.NoError(t, err)
+
+	loadedStep, err := service.LoadStepInfo(org, name, "git", 2)
 	assert.NoError(t, err)
 	assert.Equal(t, "git", loadedStep.Name)
 }

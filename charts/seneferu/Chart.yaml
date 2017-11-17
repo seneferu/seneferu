@@ -1,5 +1,0 @@
-apiVersion: v1
-description: Seneferu CI server
-name: seneferu
-version: 0.1.0
-

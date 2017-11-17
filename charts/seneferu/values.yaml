@@ -1,5 +1,0 @@
-# Default values for sparkles
-replicaCount: 1
-image:
-  tag: latest
-  name: sorenmat/seneferu

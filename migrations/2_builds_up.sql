@@ -1,6 +1,7 @@
 CREATE TABLE builds (
   uid       SERIAL PRIMARY KEY,
-  repo      VARCHAR,
+  org       VARCHAR,
+  name      VARCHAR,
   number    INTEGER,
   comitters VARCHAR,
   created   TIMESTAMP DEFAULT NOW(),
@@ -10,8 +11,7 @@ CREATE TABLE builds (
   commit    VARCHAR,
   coverage  VARCHAR,
   duration  VARCHAR,
-  CONSTRAINT FK_repos FOREIGN KEY (repo)
-  REFERENCES repositories (id),
-  CONSTRAINT build_uq
-  UNIQUE (repo, number)
+  --  CONSTRAINT FK_repos FOREIGN KEY (repo)
+  --REFERENCES repositories (id),
+  CONSTRAINT build_uq UNIQUE (org,name, number)
 );
