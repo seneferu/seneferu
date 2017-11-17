@@ -103,14 +103,14 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 	}
 
 	for _, b := range buildSteps {
-		step := &model.Step{Name: b.Name, Status: "Running"}
+		step := &model.Step{StepInfo: model.StepInfo{Name: b.Name, Status: "Running"}}
 		build.Steps = append(build.Steps, step)
 		err = service.SaveBuild(build)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("unable to save build %v", build))
 		}
 
-		go registerLog(service, repo.Id, step, buildUUID, b.Name, build, kubectl)
+		go registerLog(service, repo.Org, repo.Name, step, buildUUID, b.Name, build, kubectl)
 	}
 	for _, b := range services {
 		s := &model.Service{Name: b.Name}
@@ -119,7 +119,7 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("unable to save build %v", build))
 		}
-		go registerLogForService(service, repo.Id, buildUUID, b.Name, build, kubectl)
+		go registerLogForService(service, repo.Org, repo.Name, buildUUID, b.Name, build, kubectl)
 	}
 
 	// wait for all the build steps to finish
@@ -167,7 +167,7 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 
 	// calculate the time the build took
 	t := time.Now().Sub(build.Timestamp)
-	build.Took = formatDuration(t)
+	build.Duration = formatDuration(t)
 
 	err = service.SaveBuild(build)
 	if err != nil {
@@ -210,7 +210,7 @@ func waitForContainerCmd(name string) string {
 }
 
 func getConfigfile(build *model.Build) (*yaml.Config, error) {
-	yamldata, err := github.GetConfigFile(build.Repo, build.Commit)
+	yamldata, err := github.GetConfigFile(build.Org, build.Name, build.Commit)
 	if err != nil {
 		fmt.Println(err)
 		log.Fatal(err)
@@ -252,7 +252,7 @@ func createBuildSteps(build *model.Build, cfg *yaml.Config) ([]v1.Container, err
 	for _, cont := range cfg.Pipeline.Containers {
 
 		var cmds []string
-		projectName := build.Repo
+		projectName := build.Org + "/" + build.Name
 		// first command should be the wait for containers+
 		cmds = append(cmds, waitForContainerCmd("git"))
 
@@ -328,7 +328,7 @@ func createServiceSteps(cfg *yaml.Config) ([]v1.Container, error) {
 
 func createGitContainer(build *model.Build) v1.Container {
 
-	projectName := build.Repo
+	projectName := build.Org + "/" + build.Name
 	url := "https://github.com/" + projectName
 	workspace := shareddir + "/go/src/" + projectName
 	cloneCmd := fmt.Sprintf("git clone %v %v", url, workspace)
@@ -432,9 +432,9 @@ func waitForContainerTermination(kubectl *kubernetes.Clientset, b v1.Container, 
 	}
 }
 
-func registerLog(service storage.Service, repoID string, step *model.Step, buildUUID string, name string, build *model.Build, kubectl *kubernetes.Clientset) error {
-
-	bw := &webstream.BucketWriter{Service: service, Build: build, RepoID: repoID, Step: name}
+func registerLog(service storage.Service, org string, reponame string, step *model.Step, buildUUID string, name string, build *model.Build, kubectl *kubernetes.Clientset) error {
+	//TODO THIS SEEMS WRONG
+	bw := &webstream.BucketWriter{Service: service, Build: build, RepoID: org + reponame, Step: name}
 	// start watching the logs in a separate go routine
 	err := saveLog(kubectl, buildUUID, name, bw)
 	if err != nil {
@@ -448,8 +448,9 @@ func registerLog(service storage.Service, repoID string, step *model.Step, build
 	return nil
 }
 
-func registerLogForService(service storage.Service, repoID string, buildUUID string, name string, build *model.Build, kubectl *kubernetes.Clientset) error {
-	bw := &webstream.BucketWriter{Service: service, Build: build, RepoID: repoID, Step: name}
+func registerLogForService(service storage.Service, org string, reponame string, buildUUID string, name string, build *model.Build, kubectl *kubernetes.Clientset) error {
+	//TODO THIS SEEMS WRONG
+	bw := &webstream.BucketWriter{Service: service, Build: build, RepoID: org + reponame, Step: name}
 	// get the log without waiting, since its a service and it should be running for ever...
 	err := saveLog(kubectl, buildUUID, name, bw)
 	if err != nil {

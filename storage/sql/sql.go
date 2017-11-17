@@ -87,29 +87,29 @@ func (r *SQLDB) syncSchema() {
 func (b *SQLDB) All() ([]*model.Repo, error) {
 	var result []*model.Repo
 
-	rows, err := b.db.Query("SELECT id, name, url FROM repositories")
+	rows, err := b.db.Query("SELECT org, name, url FROM repositories")
 	if err != nil {
 		return result, err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var id string
+		var org string
 		var name string
 		var url string
-		err = rows.Scan(&id, &name, &url)
+		err = rows.Scan(&org, &name, &url)
 		if err != nil {
 			return result, err
 		}
-		result = append(result, &model.Repo{Id: id, Name: name, Url: url})
+		result = append(result, &model.Repo{Org: org, Name: name, Url: url})
 	}
 	return result, nil
 }
 
-// LoadById loads a repo from the database given an id
-func (b *SQLDB) LoadById(id string) (*model.Repo, error) {
+// LoadByOrgAndName loads a repo from the database given an org and name
+func (b *SQLDB) LoadByOrgAndName(org, name string) (*model.Repo, error) {
 	var repo model.Repo
 
-	rows, err := b.db.Query("SELECT id,url,name FROM repositories WHERE ID=$1", id)
+	rows, err := b.db.Query("SELECT org,url,name,org FROM repositories WHERE ORG=$1 AND NAME=$2", org, name)
 	if err != nil {
 		return &repo, err
 	}
@@ -117,23 +117,23 @@ func (b *SQLDB) LoadById(id string) (*model.Repo, error) {
 
 	found := false
 	for rows.Next() {
-		err = rows.Scan(&repo.Id, &repo.Url, &repo.Name)
+		err = rows.Scan(&repo.Org, &repo.Url, &repo.Name, &repo.Org)
 		if err != nil {
 			return nil, err
 		}
 		found = true
 	}
 	if !found {
-		return nil, fmt.Errorf("no repository found with name %v", id)
+		return nil, fmt.Errorf("no repository found with name %v/%v", org, name)
 	}
 	return &repo, nil
 }
 
 // LoadBuild loads a given build from the repository
-func (b *SQLDB) LoadBuild(repo string, build int) (*model.Build, error) {
+func (b *SQLDB) LoadBuild(org, name string, build int) (*model.Build, error) {
 	bb := &model.Build{}
 
-	rows, err := b.db.Query("SELECT repo, number, comitters, created, success, status, owner, commit, coverage, duration FROM builds WHERE REPO=$1 AND NUMBER=$2", repo, build)
+	rows, err := b.db.Query("SELECT org, name, number, comitters, created, success, status, commit, coverage, duration FROM builds WHERE ORG=$1 AND NAME=$2 AND NUMBER=$3", org, name, build)
 	if err != nil {
 		return bb, err
 	}
@@ -142,7 +142,7 @@ func (b *SQLDB) LoadBuild(repo string, build int) (*model.Build, error) {
 
 	for rows.Next() {
 		var commiters string
-		err = rows.Scan(&bb.Repo, &bb.Number, &commiters, &bb.Timestamp, &bb.Success, &bb.Status, &bb.Owner, &bb.Commit, &bb.Coverage, &bb.Took)
+		err = rows.Scan(&bb.Org, &bb.Name, &bb.Number, &commiters, &bb.Timestamp, &bb.Success, &bb.Status, &bb.Commit, &bb.Coverage, &bb.Duration)
 		bb.Committers = strings.Split(commiters, ",")
 		if err != nil {
 			return nil, err
@@ -153,10 +153,10 @@ func (b *SQLDB) LoadBuild(repo string, build int) (*model.Build, error) {
 }
 
 // LoadBuilds loads a all builds for a given repository
-func (b *SQLDB) LoadBuilds(repo string) ([]*model.Build, error) {
+func (b *SQLDB) LoadBuilds(org, name string) ([]*model.Build, error) {
 	var bb []*model.Build
 
-	rows, err := b.db.Query("SELECT repo,number,comitters,status,owner,commit,coverage,duration FROM builds WHERE REPO=$1", repo)
+	rows, err := b.db.Query("SELECT org,name,number,comitters,status,commit,coverage,duration FROM builds WHERE ORG=$1 AND NAME=$2", org, name)
 	if err != nil {
 		return bb, err
 	}
@@ -165,7 +165,7 @@ func (b *SQLDB) LoadBuilds(repo string) ([]*model.Build, error) {
 	for rows.Next() {
 		b := &model.Build{}
 		var c string
-		err = rows.Scan(&b.Repo, &b.Number, &c, &b.Status, &b.Owner, &b.Commit, &b.Coverage, &b.Took)
+		err = rows.Scan(&b.Org, &b.Name, &b.Number, &c, &b.Status, &b.Commit, &b.Coverage, &b.Duration)
 		b.Committers = strings.Split(c, ",")
 		bb = append(bb, b)
 		if err != nil {
@@ -176,9 +176,9 @@ func (b *SQLDB) LoadBuilds(repo string) ([]*model.Build, error) {
 }
 
 // LoadStep loads a given step in a repo based on the repo name, build id and step name
-func (b *SQLDB) LoadStep(reponame string, build int, stepname string) (*model.Step, error) {
+func (b *SQLDB) LoadStep(org, reponame string, build int, stepname string) (*model.Step, error) {
 	result := &model.Step{}
-	rows, err := b.db.Query("SELECT buildnumber,repo,name,log,status,exitcode FROM steps WHERE REPO=$1 AND buildnumber=$2 AND NAME=$3", reponame, build, stepname)
+	rows, err := b.db.Query("SELECT org, reponame, buildnumber,name,log,status,exitcode FROM steps WHERE ORG=$1 AND REPONAME=$2 AND buildnumber=$3 AND NAME=$4", org, reponame, build, stepname)
 	if err != nil {
 		return result, err
 	}
@@ -186,7 +186,7 @@ func (b *SQLDB) LoadStep(reponame string, build int, stepname string) (*model.St
 	defer rows.Close()
 
 	for rows.Next() {
-		err = rows.Scan(&result.BuildNumber, &result.Repo, &result.Name, &result.Log, &result.Status, &result.ExitCode)
+		err = rows.Scan(&result.Org, &result.Reponame, &result.BuildNumber, &result.Name, &result.Log, &result.Status, &result.ExitCode)
 		if err != nil {
 			return nil, err
 		}
@@ -195,14 +195,62 @@ func (b *SQLDB) LoadStep(reponame string, build int, stepname string) (*model.St
 
 }
 
+// LoadStep loads a given step in a repo based on the repo name, build id and step name
+func (b *SQLDB) LoadStepInfos(org string, name string, build int) ([]*model.StepInfo, error) {
+	result := []*model.StepInfo{}
+	rows, err := b.db.Query("SELECT org, reponame, buildnumber,name,status,exitcode FROM steps WHERE ORG=$1 AND REPONAME=$2 AND buildnumber=$3", org, name, build)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var stepinfo model.StepInfo
+		err = rows.Scan(&stepinfo.Org, &stepinfo.Reponame, &stepinfo.BuildNumber, &stepinfo.Name, &stepinfo.Status, &stepinfo.ExitCode)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, &stepinfo)
+	}
+	return result, nil
+
+}
+
+// LoadStep loads a given step in a repo based on the repo name, build id and step name
+func (b *SQLDB) LoadStepInfo(org string, name string, stepname string, build int) (*model.StepInfo, error) {
+	rows, err := b.db.Query("SELECT org, reponame, buildnumber,name,status,exitcode FROM steps WHERE ORG=$1 AND REPONAME=$2 AND NAME=$3 AND buildnumber=$4", org, name, stepname, build)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var stepinfo model.StepInfo
+		err = rows.Scan(&stepinfo.Org, &stepinfo.Reponame, &stepinfo.BuildNumber, &stepinfo.Name, &stepinfo.Status, &stepinfo.ExitCode)
+		if err != nil {
+			return nil, err
+		}
+		return &stepinfo, nil
+	}
+	return nil, fmt.Errorf("couldn't find step %v in %v/%v with build number %v ", stepname, org, name, build)
+
+}
+
 // SaveRepo saves the repository in the database
 func (b *SQLDB) SaveRepo(repo *model.Repo) error {
-	stmt, err := b.db.Prepare("INSERT INTO repositories(id, name, url) VALUES($1, $2, $3)")
+	if repo.Org == "" {
+		return fmt.Errorf("org is required for a repository")
+	}
+	if repo.Name == "" {
+		return fmt.Errorf("name is required for a repository")
+	}
+
+	stmt, err := b.db.Prepare("INSERT INTO repositories(org, name, url) VALUES($1, $2, $3)")
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
-	_, err = stmt.Exec(repo.Id, repo.Name, repo.Url)
+	_, err = stmt.Exec(repo.Org, repo.Name, repo.Url)
 	if err != nil {
 		return err
 	}
@@ -211,19 +259,23 @@ func (b *SQLDB) SaveRepo(repo *model.Repo) error {
 
 // SaveBuild saves a build in the database with the repo id as the key
 func (b *SQLDB) SaveBuild(build *model.Build) error {
-	if build.Repo == "" {
-		return fmt.Errorf("repo is required for the build struct")
+	if build.Org == "" {
+		return fmt.Errorf("org is required for the build struct")
 	}
-	stmt, err := b.db.Prepare("INSERT INTO builds(repo,number,comitters,status,success,owner,commit,coverage,	duration) " +
+	if build.Name == "" {
+		return fmt.Errorf("name is required for the build struct")
+	}
+
+	stmt, err := b.db.Prepare("INSERT INTO builds(org,name,number,comitters,status,success,commit,coverage,duration) " +
 		"VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)" +
-		"ON CONFLICT (repo, number) DO UPDATE SET " +
-		"comitters=$3,status=$4,success=$5,owner=$6,commit=$7,coverage=$8, duration=$9 WHERE builds.repo=$1 AND builds.number=$2")
+		"ON CONFLICT (org,name, number) DO UPDATE SET " +
+		"comitters=$4, status=$5, success=$6, commit=$7, coverage=$8, duration=$9 WHERE builds.org=$1 AND builds.name=$2 AND builds.number=$3")
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 	defer stmt.Close()
-	_, err = stmt.Exec(build.Repo, build.Number, fmt.Sprintf("%v", build.Committers), build.Status, build.Success, build.Owner, build.Commit, build.Coverage, build.Took)
+	_, err = stmt.Exec(build.Org, build.Name, build.Number, fmt.Sprintf("%v", build.Committers), build.Status, build.Success, build.Commit, build.Coverage, build.Duration)
 	if err != nil {
 		return err
 	}
@@ -232,9 +284,13 @@ func (b *SQLDB) SaveBuild(build *model.Build) error {
 
 // SaveStep saves a step in the database using the repo-buildnumber-stepname as key
 func (b *SQLDB) SaveStep(step *model.Step) error {
-	if step.Repo == "" {
-		return fmt.Errorf("repo is required for the build struct")
+	if step.Org == "" {
+		return fmt.Errorf("org is required for the step struct")
 	}
+	if step.Reponame == "" {
+		return fmt.Errorf("repository name is required for the step struct")
+	}
+
 	if step.BuildNumber <= 0 {
 		return fmt.Errorf("a build number larger then 0 is required")
 	}
@@ -242,16 +298,16 @@ func (b *SQLDB) SaveStep(step *model.Step) error {
 		return fmt.Errorf("the step must have a build number larger then 0")
 	}
 
-	stmt, err := b.db.Prepare("INSERT INTO steps(buildnumber, repo,name,log,status,exitcode) " +
-		"VALUES($1, $2, $3, $4, $5, $6) ON CONFLICT (buildnumber, repo, name) DO UPDATE SET " +
-		"buildnumber=$1, repo=$2,name=$3,log=$4,status=$5,exitcode=$6 WHERE steps.buildnumber=$1 AND steps.repo=$2 AND steps.name=$3")
+	stmt, err := b.db.Prepare("INSERT INTO steps(buildnumber, reponame, name, log, status, exitcode,org) " +
+		"VALUES($1, $2, $3, $4, $5, $6,$7) ON CONFLICT (buildnumber, reponame, name,org) DO UPDATE SET " +
+		"buildnumber=$1, reponame=$2,name=$3,log=$4,status=$5,exitcode=$6,org=$7 WHERE steps.buildnumber=$1 AND steps.reponame=$2 AND steps.name=$3 AND steps.org=$4")
 
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 	defer stmt.Close()
-	_, err = stmt.Exec(step.BuildNumber, step.Repo, step.Name, step.Log, step.Status, step.ExitCode)
+	_, err = stmt.Exec(step.BuildNumber, step.Reponame, step.Name, step.Log, step.Status, step.ExitCode, step.Org)
 	if err != nil {
 		return err
 	}

@@ -58,13 +58,16 @@ func TestHandleFetchBuildsWithNoResultShouldWork(t *testing.T) {
 
 	defer db.Close()
 
-	repoid := uuid.New()
-	orgAndName := "testorg/" + repoid
-	repo := &model.Repo{Id: orgAndName, Name: repoid}
-	b := &model.Build{Repo: orgAndName, Number: 1, Status: "Running"}
+	org := "testorg"
+	name := "repoid"
+	repo := &model.Repo{Org: org, Name: name}
+	b := &model.Build{Org: org, Name: name, Number: 1, Status: "Running"}
 
-	db.SaveRepo(repo)
-	db.SaveBuild(b)
+	err = db.SaveRepo(repo)
+	assert.NoError(t, err)
+
+	err = db.SaveBuild(b)
+	assert.NoError(t, err)
 
 	if err != nil {
 		t.Error(err)
@@ -72,12 +75,12 @@ func TestHandleFetchBuildsWithNoResultShouldWork(t *testing.T) {
 	hf := handleFetchBuilds(db)
 
 	e := echo.New()
-	req := httptest.NewRequest(echo.GET, "/repo/"+orgAndName+"/builds", nil)
+	req := httptest.NewRequest(echo.GET, "/repo/"+org+"/"+name+"/builds", nil)
 
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.SetParamNames("org", "id")
-	c.SetParamValues("testorg", repoid)
+	c.SetParamValues(org, name)
 
 	err = hf(c)
 	if err != nil {
@@ -86,10 +89,10 @@ func TestHandleFetchBuildsWithNoResultShouldWork(t *testing.T) {
 
 	var res []model.Build
 	bytes := rec.Body.Bytes()
-	json.Unmarshal(bytes, &res)
-	if res[0].Repo != orgAndName {
-		t.Error("the id should be the same as the requested one")
-	}
+	err = json.Unmarshal(bytes, &res)
+	assert.NoError(t, err)
+	assert.Equal(t, org, res[0].Org)
+	assert.Equal(t, name, res[0].Name)
 }
 
 func TestHandleFetchRepoDataWithNoResultShouldWork(t *testing.T) {
@@ -99,33 +102,32 @@ func TestHandleFetchRepoDataWithNoResultShouldWork(t *testing.T) {
 	}
 	defer db.Close()
 
-	repoid := uuid.New()
-	orgAndName := "testorg/" + repoid
+	name := uuid.New()
+	org := "testorg"
 
-	repo := &model.Repo{Id: orgAndName, Name: repoid}
+	repo := &model.Repo{Org: org, Name: name}
 
 	err = db.SaveRepo(repo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	hf := handleFetchRepoData(db)
 
 	e := echo.New()
-	req := httptest.NewRequest(echo.GET, "/repo/"+orgAndName, nil)
+	req := httptest.NewRequest(echo.GET, "/repo/"+org+"/"+name, nil)
 
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.SetParamNames("org", "id")
-	c.SetParamValues("testorg", repoid)
+	c.SetParamValues(org, name)
 	err = hf(c)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
+
 	var res map[string]string
-	json.Unmarshal(rec.Body.Bytes(), &res)
-	assert.Equal(t, orgAndName, res["id"])
-	assert.Equal(t, repoid, res["name"])
+	err = json.Unmarshal(rec.Body.Bytes(), &res)
+	assert.NoError(t, err)
+
+	assert.Equal(t, org, res["org"])
+	assert.Equal(t, name, res["name"])
 }
 
 func TestGetRepos(t *testing.T) {
@@ -134,22 +136,19 @@ func TestGetRepos(t *testing.T) {
 		t.Error(err)
 	}
 	defer db.Close()
-
-	repoid := uuid.New()
-	repo := &model.Repo{Id: repoid, Name: "test" + repoid}
+	org := "seneferu-" + uuid.New()
+	firstName := uuid.New()
+	repo := &model.Repo{Org: org, Name: firstName}
 
 	err = db.SaveRepo(repo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	repoid1 := uuid.New()
-	repo1 := &model.Repo{Id: repoid1, Name: "test_1" + repoid1}
+	secoundName := "test_1" + repoid1
+	repo1 := &model.Repo{Org: org, Name: secoundName}
 
 	err = db.SaveRepo(repo1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	hf := handleFetchRepos(db)
 
@@ -159,23 +158,23 @@ func TestGetRepos(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	err = hf(c)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	var res []model.Repo
-	json.Unmarshal(rec.Body.Bytes(), &res)
+	err = json.Unmarshal(rec.Body.Bytes(), &res)
+	assert.NoError(t, err)
+
 	foundFirst := false
 	foundSecond := false
 	for _, v := range res {
-		if v.Id == repoid {
+		if v.Name == firstName && v.Org == org {
 			foundFirst = true
 		}
-		if v.Id == repoid1 {
+		if v.Name == secoundName && v.Org == org {
 			foundSecond = true
 		}
 	}
 	if !foundFirst || !foundSecond {
-		t.Error("Repos should have been in the repo list")
+		t.Error("Repos should have been in the repo list", foundFirst, foundSecond)
 	}
 }

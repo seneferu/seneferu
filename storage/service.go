@@ -8,10 +8,12 @@ import (
 
 type Service interface {
 	All() ([]*model.Repo, error)
-	LoadById(string) (*model.Repo, error)
-	LoadBuilds(string) ([]*model.Build, error)
-	LoadBuild(string, int) (*model.Build, error)
-	LoadStep(string, int, string) (*model.Step, error)
+	LoadByOrgAndName(string, string) (*model.Repo, error)
+	LoadBuilds(string, string) ([]*model.Build, error)
+	LoadBuild(string, string, int) (*model.Build, error)
+	LoadStep(string, string, int, string) (*model.Step, error)
+	LoadStepInfos(org string, name string, build int) ([]*model.StepInfo, error)
+	LoadStepInfo(org string, name string, stepname string, build int) (*model.StepInfo, error)
 	SaveRepo(*model.Repo) error
 	SaveBuild(*model.Build) error
 	SaveStep(*model.Step) error
