@@ -27,7 +27,7 @@ import (
 
 const shareddir = "/share"
 
-func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build *model.Build, repo *model.Repo) error {
+func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build *model.Build, repo *model.Repo, token string) error {
 	pod := &v1.Pod{Spec: v1.PodSpec{
 		RestartPolicy: "Never",
 	}}
@@ -62,7 +62,7 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 	}
 
 	// add container to the pod
-	cfg, err := getConfigfile(build)
+	cfg, err := getConfigfile(build, token)
 	if err != nil {
 		return errors.Wrap(err, "unable to handle buildconfig file")
 	}
@@ -209,8 +209,8 @@ func waitForContainerCmd(name string) string {
 	return command
 }
 
-func getConfigfile(build *model.Build) (*yaml.Config, error) {
-	yamldata, err := github.GetConfigFile(build.Org, build.Name, build.Commit)
+func getConfigfile(build *model.Build, token string) (*yaml.Config, error) {
+	yamldata, err := github.GetConfigFile(build.Org, build.Name, build.Commit, token)
 	if err != nil {
 		fmt.Println(err)
 		log.Fatal(err)

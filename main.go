@@ -17,6 +17,7 @@ var (
 	kubeCfgFile  = flag.String("kubeconfig", "", "Kubernetes Config File")
 	githubSecret = flag.String("githubsecret", "", "Github secret token, needs to match the one on Github ")
 	helmHost     = flag.String("helmhost", "", "Hostname and port of the Helm host / tiller")
+	githubToken  = flag.String("githubToken", "", "Github access token, to access the API")
 )
 
 func main() {
@@ -32,6 +33,12 @@ func main() {
 	}
 	if *helmHost == "" {
 		log.Fatal("helmHost can't be empty")
+	}
+	if *githubToken == "" {
+		*githubToken = os.Getenv("githubtoken")
+	}
+	if *githubToken == "" {
+		log.Fatal("githubtoken can't be empty")
 	}
 
 	config, err := rest.InClusterConfig()
@@ -53,5 +60,5 @@ func main() {
 		log.Fatal(errors.Wrap(err, "unable create kubectl"))
 	}
 	fmt.Println("Starting web server...")
-	web.StartWebServer(service, kubectl, *githubSecret, *helmHost)
+	web.StartWebServer(service, kubectl, *githubSecret, *helmHost, *githubToken)
 }
