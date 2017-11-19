@@ -18,6 +18,8 @@ type Build struct {
 	Commit     string     `json:"commit"`
 	Coverage   string     `json:"coverage"`
 	Duration   string     `json:"duration"`
+
+	Ref string
 }
 
 type StepInfo struct {

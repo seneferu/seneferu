@@ -45,9 +45,20 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 
 	fmt.Println("Scheduling build: ", buildUUID)
 	pod.ObjectMeta.Name = buildUUID
+
+	// shared directory for the build
 	vol1 := v1.Volume{}
 	vol1.Name = "shared-data"
 	vol1.EmptyDir = &v1.EmptyDirVolumeSource{}
+
+	volSSHAgent := v1.Volume{}
+	volSSHAgent.Name = "ssh-agent"
+	volSSHAgent.EmptyDir = &v1.EmptyDirVolumeSource{}
+
+	sshvol := v1.Volume{}
+	sshvol.Name = "sshvolume"
+	perm := int32(0400)
+	sshvol.Secret = &v1.SecretVolumeSource{SecretName: "sshkey", DefaultMode: &perm}
 
 	dockerSocket := v1.Volume{
 		Name: "docker-socket",
@@ -58,7 +69,9 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 
 	pod.Spec.Volumes = []v1.Volume{
 		vol1,
+		sshvol,
 		dockerSocket,
+		volSSHAgent,
 	}
 
 	// add container to the pod
@@ -66,9 +79,11 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 	if err != nil {
 		return errors.Wrap(err, "unable to handle buildconfig file")
 	}
-
+	var prepareSteps []v1.Container
 	var buildSteps []v1.Container
-	buildSteps = append(buildSteps, createGitContainer(build))
+	prepareSteps = append(prepareSteps, createSSHAgentContainer())
+	prepareSteps = append(prepareSteps, createSSHKeyAdd())
+	prepareSteps = append(prepareSteps, createGitContainer(build))
 	x, err := createBuildSteps(build, cfg)
 	buildSteps = append(buildSteps, x...)
 	if err != nil {
@@ -79,7 +94,7 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 	if err != nil {
 		return errors.Wrap(err, "unable to create service")
 	}
-
+	pod.Spec.Containers = append(pod.Spec.Containers, prepareSteps...)
 	pod.Spec.Containers = append(pod.Spec.Containers, services...)
 	pod.Spec.Containers = append(pod.Spec.Containers, buildSteps...)
 
@@ -255,11 +270,15 @@ func createBuildSteps(build *model.Build, cfg *yaml.Config) ([]v1.Container, err
 		projectName := build.Org + "/" + build.Name
 		// first command should be the wait for containers+
 		cmds = append(cmds, waitForContainerCmd("git"))
+		cmds = append(cmds, "ssh-keyscan -t rsa github.com > ~/.ssh/known_hosts")
 
 		if count > 0 {
 			cmds = append(cmds, waitForContainerCmd(fmt.Sprintf("build%v", count-1))) // wait for the previous build step
 		}
-		cmds = append(cmds, fmt.Sprintf("cd "+shareddir+"/go/src/%v", projectName))
+		provider := "github.com"
+		workspace := shareddir + "/go/src/" + provider + "/" + projectName
+
+		cmds = append(cmds, fmt.Sprintf("cd %v", workspace))
 		for _, v := range cont.Commands {
 			cmds = append(cmds, v)
 		}
@@ -284,6 +303,10 @@ func createBuildSteps(build *model.Build, cfg *yaml.Config) ([]v1.Container, err
 				{
 					Name:      "shared-data",
 					MountPath: shareddir,
+				},
+				{
+					Name:      "sshvolume",
+					MountPath: "/root/.ssh",
 				},
 			},
 			Env:     buildEnv,
@@ -329,13 +352,19 @@ func createServiceSteps(cfg *yaml.Config) ([]v1.Container, error) {
 func createGitContainer(build *model.Build) v1.Container {
 
 	projectName := build.Org + "/" + build.Name
-	url := "https://github.com/" + projectName
-	workspace := shareddir + "/go/src/" + projectName
+	url := "git@github.com:" + projectName
+	provider := "github.com"
+	workspace := shareddir + "/go/src/" + provider + "/" + projectName
+
+	sshTrustCmd := "ssh-keyscan -t rsa github.com > ~/.ssh/known_hosts"
 	cloneCmd := fmt.Sprintf("git clone %v %v", url, workspace)
 	curWDCmd := fmt.Sprintf("cd %v", workspace)
-	checkoutCmd := fmt.Sprintf("git checkout %v", build.Commit)
+	// TODO take the last element of the refs/head/init this is most likely not a good idea
+	checkoutCmd := fmt.Sprintf("git checkout %v", strings.Split(build.Ref, "/")[2])
+	fmt.Println(checkoutCmd)
+
 	doneCmd := "touch " + shareddir + "/git.done"
-	cmds := []string{cloneCmd, curWDCmd, checkoutCmd, doneCmd}
+	cmds := []string{waitForContainerCmd("ssh-key-add"), "mkdir ~/.ssh", sshTrustCmd, cloneCmd, curWDCmd, checkoutCmd, doneCmd}
 	return v1.Container{
 		Name:            "git",
 		Image:           "sorenmat/git:1.0",
@@ -345,14 +374,80 @@ func createGitContainer(build *model.Build) v1.Container {
 				Name:      "shared-data",
 				MountPath: shareddir,
 			},
+			{
+				Name:      "ssh-agent",
+				MountPath: "/.ssh-agent",
+			},
 		},
+
+		Command: []string{"/bin/sh", "-c", "echo $CI_SCRIPT | base64 -d |/bin/sh -e"},
+
+		Env: []v1.EnvVar{
+			{Name: "SSH_AUTH_SOCK", Value: "/.ssh-agent/socket"},
+			{Name: "CI_SCRIPT", Value: generateScript(cmds)},
+		},
+		Lifecycle: &v1.Lifecycle{
+			PreStop: &v1.Handler{Exec: &v1.ExecAction{Command: []string{"/usr/bin/touch", shareddir + "/git.done"}}},
+		},
+	}
+}
+
+func createSSHAgentContainer() v1.Container {
+	cmds := []string{"ssh-agent -a /.ssh-agent/socket -D"}
+	return v1.Container{
+		Name:            "ssh-agent",
+		Image:           "nardeas/ssh-agent",
+		ImagePullPolicy: v1.PullIfNotPresent,
+		VolumeMounts: []v1.VolumeMount{
+			{
+				Name:      "shared-data",
+				MountPath: shareddir,
+			},
+			{
+				Name:      "sshvolume",
+				MountPath: "/root/.ssh",
+			},
+			{
+				Name:      "ssh-agent",
+				MountPath: "/.ssh-agent",
+			},
+		},
+
 		Command: []string{"/bin/sh", "-c", "echo $CI_SCRIPT | base64 -d |/bin/sh -e"},
 
 		Env: []v1.EnvVar{
 			{Name: "CI_SCRIPT", Value: generateScript(cmds)},
 		},
-		Lifecycle: &v1.Lifecycle{
-			PreStop: &v1.Handler{Exec: &v1.ExecAction{Command: []string{"/usr/bin/touch", shareddir + "/git.done"}}},
+	}
+}
+
+func createSSHKeyAdd() v1.Container {
+	doneCmd := "touch " + shareddir + "/ssh-key-add.done"
+
+	cmds := []string{"ssh-add /root/.ssh/id_rsa", doneCmd}
+	return v1.Container{
+		Name:            "ssh-key-add",
+		Image:           "nardeas/ssh-agent",
+		ImagePullPolicy: v1.PullIfNotPresent,
+		VolumeMounts: []v1.VolumeMount{
+			{
+				Name:      "shared-data",
+				MountPath: shareddir,
+			},
+			{
+				Name:      "sshvolume",
+				MountPath: "/root/.ssh",
+			},
+			{
+				Name:      "ssh-agent",
+				MountPath: "/.ssh-agent",
+			},
+		},
+
+		Command: []string{"/bin/sh", "-c", "echo $CI_SCRIPT | base64 -d |/bin/sh -e"},
+
+		Env: []v1.EnvVar{
+			{Name: "CI_SCRIPT", Value: generateScript(cmds)},
 		},
 	}
 }

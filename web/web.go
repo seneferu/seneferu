@@ -66,6 +66,7 @@ func HandlePush(service storage.Service, kubectl *kubernetes.Clientset, token st
 			Org:        pl.Repository.Owner.Name,
 			Name:       pl.Repository.Name,
 			Commit:     pl.HeadCommit.ID,
+			Ref:        pl.Ref,
 			Committers: []string{pl.Pusher.Name},
 			Status:     "Created",
 			Timestamp:  time.Now(),

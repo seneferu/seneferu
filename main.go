@@ -59,6 +59,11 @@ func main() {
 	if err != nil {
 		log.Fatal(errors.Wrap(err, "unable create kubectl"))
 	}
+	/*
+		err = builder.CreateConfigmap(kubectl, sshkey)
+		if err != nil {
+			log.Fatal("Unable to create secret for ssh key: ",err)
+		}*/
 	fmt.Println("Starting web server...")
 	web.StartWebServer(service, kubectl, *githubSecret, *helmHost, *githubToken)
 }
