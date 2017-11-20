@@ -13,7 +13,7 @@ before_script:
   - mkdir -p $GOPATH/src/$REPO_NAME
   - ln -svf $CI_PROJECT_DIR/* $GOPATH/src/$REPO_NAME
   - cd $GOPATH/src/$REPO_NAME
-  
+
 stages:
     - validate
     - build
@@ -40,6 +40,16 @@ compile:
     artifacts:
       untracked: true
 
+compile-js:
+  stage: build
+  image: node:9.2.0
+  script:
+    - cd $CI_PROJECT_DIR
+    - npm install
+    - npm run build
+  artifacts:
+    paths:
+    - js/
 
 release-image:
   stage: release
@@ -50,6 +60,7 @@ release-image:
     - docker:dind
   dependencies: 
     - compile
+    - compile-js
   script:
     - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN registry.gitlab.com
     - docker version
