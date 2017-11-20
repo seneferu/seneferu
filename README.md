@@ -2,9 +2,7 @@ Simple Kubernetes based build
 
 Named after the pharo that build 3 pyramids, because he was surely awesome... like this tools
 
-Build in 24 hours in the Tradeshift Hackathon 2017, the code is __utterly crap__ and thrown
-together be 4 sleep deprived ponies, but the concept seems to
-be working.
+Build in 24 hours in the Tradeshift Hackathon 2017
 
 __DO NOT USE IN PRODUCTION__ or well that's up to you I guess.
 
@@ -20,6 +18,13 @@ That way we can leverage Kubernetes for scaling and reliability.
 # Building
 
 `go build`
+
+# Requirements
+
+A Postgres database up and running.
+
+A Secret in Kubernetes called sshkey that contains a SSH key for accessing private repositories
+
 
 # Running
 
