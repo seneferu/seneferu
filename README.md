@@ -2,7 +2,7 @@ Simple Kubernetes based build
 
 Named after the pharo that build 3 pyramids, because he was surely awesome... like this tools
 
-Build in 24 hours in the Tradeshift Hackathon 2017
+Was initial conceived in the Tradeshift Global Hackathon in 2017.
 
 __DO NOT USE IN PRODUCTION__ or well that's up to you I guess.
 
