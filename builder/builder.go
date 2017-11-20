@@ -98,9 +98,16 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 	pod.Spec.Containers = append(pod.Spec.Containers, services...)
 	pod.Spec.Containers = append(pod.Spec.Containers, buildSteps...)
 
+	for _, v := range buildSteps {
+		err := github.ReportBack(github.GithubStatus{State: "pending", Context: v.Name}, build.Org, build.Name, build.Commit, token)
+		if err != nil {
+			log.Println("unable to report status back to github")
+		}
+	}
+
 	_, err = kubectl.CoreV1().Pods("default").Create(pod)
 	if err != nil {
-		log.Fatalf("Error starting build: %v", err)
+		return errors.Wrapf(err, "Error starting build: %v", err)
 	}
 	build.Status = "Started"
 	err = service.SaveBuild(build)
@@ -154,6 +161,17 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 					step.Status = "Failed"
 				}
 				step.ExitCode = exitCode
+				var state string
+				if exitCode == 0 {
+					state = "success"
+				} else {
+					state = "error"
+				}
+				err := github.ReportBack(github.GithubStatus{State: state, Context: step.Name}, build.Org, build.Name, build.Commit, token)
+				if err != nil {
+					log.Println("unable to report status back to github")
+				}
+
 			}
 		}
 	}
@@ -573,9 +591,9 @@ func waitForContainer(kubectl *kubernetes.Clientset, buildname string) error {
 }
 
 // saveLog get the build of container in a running pod
-func saveLog(clientset *kubernetes.Clientset, pod string, container string, bw *webstream.BucketWriter) error {
+func saveLog(kubectl *kubernetes.Clientset, pod string, container string, bw *webstream.BucketWriter) error {
 	log.Printf("Trying to get log for %v %v\n", pod, container)
-	req := clientset.CoreV1().Pods("default").GetLogs(pod, &v1.PodLogOptions{
+	req := kubectl.CoreV1().Pods("default").GetLogs(pod, &v1.PodLogOptions{
 		Container: container,
 		Follow:    true,
 		//Timestamps: true,

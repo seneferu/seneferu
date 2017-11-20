@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"bytes"
+	"encoding/json"
 	"github.com/bmatsuo/go-jsontree"
 	"github.com/pkg/errors"
 )
@@ -25,11 +27,7 @@ func GetConfigFile(org, repo, commit, token string) ([]byte, error) {
 	}
 	client := getHTTPSClient()
 
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to create request to github")
-	}
-	req.SetBasicAuth("", token)
+	req, err := githubRequest("GET", url, token)
 	resp, err := client.Do(req)
 
 	if err != nil {
@@ -89,11 +87,8 @@ func fetchConfigFromGithub(org, repo, commit, token string) ([]byte, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%v/%v/git/trees/%v", org, repo, commit)
 	fmt.Println("About to fetch: ", url)
 
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to create request to github")
-	}
-	req.SetBasicAuth("", token)
+	req, err := githubRequest("GET", url, token)
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch file from github")
@@ -107,10 +102,46 @@ func fetchConfigFromGithub(org, repo, commit, token string) ([]byte, error) {
 	return j, nil
 }
 
+func githubRequest(method, url, token string) (*http.Request, error) {
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to create request to github")
+	}
+	req.SetBasicAuth("", token)
+	return req, nil
+}
+
 func getHTTPSClient() *http.Client {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	client := &http.Client{Transport: tr}
 	return client
+}
+
+func ReportBack(state GithubStatus, owner, repo, sha, token string) error {
+	body, err := json.Marshal(&state)
+	if err != nil {
+		return errors.Wrap(err, "unable to marshal status struct")
+	}
+
+	client := getHTTPSClient()
+	url := fmt.Sprintf("https://api.github.com/repos/%v/%v/statuses/%v", owner, repo, sha)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		return errors.Wrap(err, "unable to create request to github")
+	}
+	req.SetBasicAuth("", token)
+	_, err = client.Do(req)
+	if err != nil {
+		return errors.Wrap(err, "unable to post status to github")
+	}
+	return nil
+}
+
+type GithubStatus struct {
+	State       string `json:"state"`
+	TargetURL   string `json:"target_url"`
+	Description string `json:"description"`
+	Context     string `json:"context"`
 }
