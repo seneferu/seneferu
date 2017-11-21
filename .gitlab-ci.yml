@@ -44,6 +44,8 @@ compile:
 release-image:
   stage: release
   image: docker:git
+  only:
+    - master
   services:
     - docker:dind
   dependencies: 
