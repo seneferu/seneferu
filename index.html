@@ -13,47 +13,11 @@
 <!-- Latest compiled and minified JavaScript -->
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
 
-
-<script src="/scripts/ansi_up.js"></script>
-<script src="https://unpkg.com/vue"></script>
-
 <link rel="stylesheet" href="/styles/style_v2.css" />
 <link rel="stylesheet" href="/styles/pipeline.css" />
 </head>
 <body>
-<div class="container-fluid" id="app">
-<div class="row">
-    <div class="col-xs-3 sidebar"><div class="row">
-        <div id="repolist" class="col-xs-10 sidebarlist">
-            <h2 class="listheader">REPOSITORIES</h2>
-            <ul class="nav">
-                <repo-item v-for="repo in repos" v-bind:repo="repo" v-bind:key="repo.id" v-on:reposelected="selectRepo"></repo-item>
-            </ul>
-        </div>
-        <div id="buildlist" class="col-xs-10 sidebarlist collapsed">
-            <h3 class="listheader">BUILDS</h3>
-            <ul class="nav">
-                <build-item v-for="build in builds" v-bind:build="build" v-bind:key="build.id" v-on:buildselected="selectBuild"></build-item>
-            </ul>
-        </div>
-    </div></div>
-    <div class="col-xs-offset-3 col-xs-9 main">
-        <div class="row" id="build-info">
-            <div class="col-xs-12">
-                <build-info v-if="selectedBuild" v-bind:build="selectedBuild" v-on:step="showStep"></build-info>
-            </div>
-        </div>
-        <div class="row">
-            <div class="col-xs-12 output-container">
-                <console-output v-if="selectedStep.build" v-bind:build-output="selectedStep.build"></console-output>
-                <div v-if="!selectedStep.build">
-                    SELECT A BUILD STEP TO SEE WHAT HAPPENS IN THERE :-O
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-</div>
+    <div id="app"></div>
 <script>
 function toggleSidebars(){
     $('#repolist, #buildlist').toggleClass('collapsed');
@@ -74,24 +38,6 @@ $(document).ready(function(){
 })
 </script>
 
-<script type="text/x-template" id="application">
-
-</script>
-<script type="text/x-template" id="repo-item">
-    <li><div><a v-on:click='selectRepo'>{{ repo.id }}</a></div></li>
-</script>
-<script type="text/x-template" id="build-item">
-    <li class='builditem'>
-        <a v-on:click="selectBuild" :class="[status_class(build), { active: isSelected }]">
-            <span v-bind:class="['glyphicon', status_icon(build) ]"></span>
-            <span>{{ time(build.timestamp) }}</span>
-        </a>
-    </li>
-</script>
-<script type="text/x-template" id="">
-
-</script>
-
-<script src="/scripts/app.js"></script>
+<script src="/js/build.js"></script>
 </body>
 </html>
