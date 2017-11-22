@@ -27,6 +27,15 @@ import (
 
 const shareddir = "/share"
 
+func CreateSSHKeySecret(kubectl *kubernetes.Clientset, sshkey string) error {
+	cm := v1.Secret{
+		ObjectMeta: meta_v1.ObjectMeta{Name: "sshkey"},
+		Data:       map[string][]byte{"id_rsa": []byte(sshkey)},
+	}
+	_, err := kubectl.CoreV1().Secrets("default").Create(&cm)
+	return err
+}
+
 func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build *model.Build, repo *model.Repo, token string) error {
 	pod := &v1.Pod{Spec: v1.PodSpec{
 		RestartPolicy: "Never",
