@@ -15,12 +15,12 @@ import (
 	"strings"
 )
 
-// BoltDB is the service implementation for BoltDB
+// Postgresql is the service implementation for Postgresql
 type SQLDB struct {
 	db *sql.DB
 }
 
-// New Create a new BoltDB compatiable service
+// New Create a new Postgresql compatiable service
 func New() (storage.Service, error) {
 	host := "localhost"
 	if os.Getenv("POSTGRES_HOST") != "" {
@@ -32,12 +32,12 @@ func New() (storage.Service, error) {
 	}
 	password := "postgres"
 	if os.Getenv("POSTGRES_PASSWD") != "" {
-		user = os.Getenv("POSTGRES_PASSWD")
+		password = os.Getenv("POSTGRES_PASSWD")
 	}
 
 	db, err := sql.Open("postgres", "host="+host+" user="+user+" password="+password+" dbname=seneferu sslmode=disable")
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to load db")
+		return nil, errors.Wrap(err, "unable to open connection to database")
 	}
 
 	b := SQLDB{db: db}
