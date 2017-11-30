@@ -34,27 +34,16 @@ When a push event is triggered on Github, Seneferu will then receive the payload
 The build will be executed in the same Kubernetes cluster as the build server is running in.
 
 
-```
-Usage of ./seneferu:
-  -alsologtostderr
-    	log to standard error as well as files
-  -githubsecret string
-    	Github secret token, needs to match the one on Github
-  -kubeconfig string
-    	Kubernetes Config File
-  -log_backtrace_at value
-    	when logging hits line file:N, emit a stack trace
-  -log_dir string
-    	If non-empty, write log files in this directory
-  -logtostderr
-    	log to standard error instead of files
-  -stderrthreshold value
-    	logs at or above this threshold go to stderr
-  -v value
-    	log level for V logs
-  -vmodule value
-    	comma-separated list of pattern=N settings for file-filtered logging
+```shell
+usage: seneferu --githubsecret=GITHUBSECRET --githubToken=GITHUBTOKEN --sshkey=SSHKEY [<flags>]
 
+Flags:
+  --help                       Show context-sensitive help (also try --help-long and --help-man).
+  --kubeconfig=KUBECONFIG      Kubernetes Config File
+  --githubsecret=GITHUBSECRET  Github secret token, needs to match the one on Github
+  --helmhost=HELMHOST          Hostname and port of the Helm host / tiller
+  --githubToken=GITHUBTOKEN    Github access token, to access the API
+  --sshkey=SSHKEY              Github ssh key, used for cloning the repositories
 ```
 
 Build repositories that contains a .ci.yaml file

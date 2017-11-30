@@ -35,6 +35,24 @@
 			"revisionTime": "2017-08-10T14:37:23Z"
 		},
 		{
+			"checksumSHA1": "KmjnydoAbofMieIWm+it5OWERaM=",
+			"path": "github.com/alecthomas/template",
+			"revision": "a0175ee3bccc567396460bf5acd36800cb10c49c",
+			"revisionTime": "2016-04-05T07:15:01Z"
+		},
+		{
+			"checksumSHA1": "3wt0pTXXeS+S93unwhGoLIyGX/Q=",
+			"path": "github.com/alecthomas/template/parse",
+			"revision": "a0175ee3bccc567396460bf5acd36800cb10c49c",
+			"revisionTime": "2016-04-05T07:15:01Z"
+		},
+		{
+			"checksumSHA1": "fCc3grA7vIxfBru7R3SqjcW+oLI=",
+			"path": "github.com/alecthomas/units",
+			"revision": "2efee857e7cfd4f3d0138cc3cbb1b4966962b93a",
+			"revisionTime": "2015-10-22T06:55:26Z"
+		},
+		{
 			"checksumSHA1": "1TUqo683ELtWtgyNJ8UMtdGyg/Y=",
 			"path": "github.com/asdine/storm",
 			"revision": "617fe4aad8735e47f878c39a597ec135963d1d79",
@@ -453,6 +471,13 @@
 			"revisionTime": "2017-09-10T13:46:14Z"
 		},
 		{
+			"checksumSHA1": "zKKp5SZ3d3ycKe4EKMNT0BqAWBw=",
+			"origin": "github.com/stretchr/testify/vendor/github.com/pmezard/go-difflib/difflib",
+			"path": "github.com/pmezard/go-difflib/difflib",
+			"revision": "1f4a1643a57e798696635ea4c126e9127adb7d3c",
+			"revisionTime": "2016-02-21T10:44:43Z"
+		},
+		{
 			"checksumSHA1": "SFtxjjmcMpib3z+AnePvwZobeyA=",
 			"path": "github.com/sorenmat/pipeline/pipeline/frontend/yaml",
 			"revision": "91a711c3761d953d439ac210b1001b315a319576",
@@ -464,6 +489,12 @@
 			"path": "github.com/spf13/pflag",
 			"revision": "3b05bbfa0a45413bfa184edbf9af617e277962fb",
 			"revisionTime": "2017-09-21T16:56:50Z"
+		},
+		{
+			"checksumSHA1": "Bn333k9lTndxU3D6n/G5c+GMcYY=",
+			"path": "github.com/stretchr/testify/assert",
+			"revision": "1f4a1643a57e798696635ea4c126e9127adb7d3c",
+			"revisionTime": "2016-02-21T10:44:43Z"
 		},
 		{
 			"checksumSHA1": "LTOa3BADhwvT0wFCknPueQALm8I=",
@@ -684,6 +715,12 @@
 			"path": "google.golang.org/grpc/transport",
 			"revision": "654e8430c53fb42d1afd3f56dab13832c91e3c37",
 			"revisionTime": "2017-06-23T02:34:00Z"
+		},
+		{
+			"checksumSHA1": "SeYI7DRWrd0Ku+CLavuwIz3EEmQ=",
+			"path": "gopkg.in/alecthomas/kingpin.v2",
+			"revision": "e9044be3ab2a8e11d4e1f418d12f0790d57e8d70",
+			"revisionTime": "2016-08-29T10:30:05Z"
 		},
 		{
 			"checksumSHA1": "2FweScbG38wfDVJvJnRwxC7qeeA=",
