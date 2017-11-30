@@ -27,12 +27,14 @@ import (
 
 const shareddir = "/share"
 
+// CreateSSHKeySecret creates and ssh key in the Kubernetes cluster to be used for
+// cloning repositories
 func CreateSSHKeySecret(kubectl *kubernetes.Clientset, sshkey string) error {
 	cm := v1.Secret{
 		ObjectMeta: meta_v1.ObjectMeta{Name: "sshkey"},
 		Data:       map[string][]byte{"id_rsa": []byte(sshkey)},
 	}
-	_, err := kubectl.CoreV1().Secrets("default").Create(&cm)
+	_, err := kubectl.CoreV1().Secrets("default").Update(&cm)
 	return err
 }
 
