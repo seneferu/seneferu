@@ -1,13 +1,14 @@
 <template>
     <li>
-        <div><a v-on:click='selectRepo'>{{ repo.id }}</a></div>
+        <div><a v-on:click='selectRepo'>{{ repo.org }}/{{ repo.name }}</a></div>
     </li>
 </template>
 
 <script>
-module.exports = {
-    props: ['repo'],
-    template: "#repo-item",
+export default {
+    props: {
+        repo : { type: Object }
+    },
     methods: {
         selectRepo: function(){
             this.$emit('reposelected', this.repo)

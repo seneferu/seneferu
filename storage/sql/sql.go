@@ -85,7 +85,7 @@ func (r *SQLDB) syncSchema() {
 
 // All returns all the ids of all the repos
 func (b *SQLDB) All() ([]*model.Repo, error) {
-	var result []*model.Repo
+	result := make([]*model.Repo, 0)
 
 	rows, err := b.db.Query("SELECT org, name, url FROM repositories")
 	if err != nil {
@@ -154,7 +154,7 @@ func (b *SQLDB) LoadBuild(org, name string, build int) (*model.Build, error) {
 
 // LoadBuilds loads a all builds for a given repository
 func (b *SQLDB) LoadBuilds(org, name string) ([]*model.Build, error) {
-	var bb []*model.Build
+	bb := make([]*model.Build, 0)
 
 	rows, err := b.db.Query("SELECT org,name,number,comitters,status,commit,coverage,duration FROM builds WHERE ORG=$1 AND NAME=$2", org, name)
 	if err != nil {
@@ -197,7 +197,7 @@ func (b *SQLDB) LoadStep(org, reponame string, build int, stepname string) (*mod
 
 // LoadStep loads a given step in a repo based on the repo name, build id and step name
 func (b *SQLDB) LoadStepInfos(org string, name string, build int) ([]*model.StepInfo, error) {
-	result := []*model.StepInfo{}
+	result := make([]*model.StepInfo, 0)
 	rows, err := b.db.Query("SELECT org, reponame, buildnumber,name,status,exitcode FROM steps WHERE ORG=$1 AND REPONAME=$2 AND buildnumber=$3", org, name, build)
 	if err != nil {
 		return nil, err

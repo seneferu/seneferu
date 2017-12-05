@@ -92,7 +92,7 @@ func StartWebServer(db storage.Service, kubectl *kubernetes.Clientset, secret st
 	e := echo.New()
 
 	e.Static("/styles", "styles")
-	e.Static("/scripts", "scripts")
+	e.Static("/js", "js")
 	e.Static("/images", "images")
 	e.File("/", "index.html")
 	e.GET("/status", handleStatus())
@@ -193,7 +193,6 @@ func handleFetchRepoData(db storage.Service) echo.HandlerFunc {
 		fmt.Printf("Id: %v,Org: %v\n", id, org)
 		repo, err := db.LoadByOrgAndName(org, id)
 		if err != nil {
-			c.Error(err)
 			return err
 		}
 

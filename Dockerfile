@@ -2,7 +2,7 @@ FROM scratch
 MAINTAINER Søren Mathiasen <sorenm@mymessages.dk>
 
 # UI stuff
-ADD js/ scripts
+ADD js/ js
 ADD styles/ styles
 ADD migrations/ migrations
 

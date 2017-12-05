@@ -10,9 +10,9 @@ module.exports = api = {
             error: api._fail(cb)
         });
     },
-    builds: function(cb, repoId){
+    builds: function(cb, org, name){
         return $.ajax({
-            url: "/repo/"+repoId+"/builds",
+            url: "/repo/"+org+"/"+name+"/builds",
             type: "GET",
             success: api._success(cb),
             error: api._fail(cb)

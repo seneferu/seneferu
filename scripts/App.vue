@@ -50,9 +50,12 @@ var wrapWrap = cbWrap.bind(undefined, function(err){ app.error(err); });
 export default {
     name: 'app',
     data () {
+        var self = this;
+        api.repos(wrapWrap((val) => self.repos = val ));
+
         return {
             repoSearch: '',
-            repos: [],
+            repos: [{org: "Foo", name: "Baar"}],
             buildInfo: {},
             builds: {},
             selectedRepo: [],
@@ -85,7 +88,7 @@ export default {
             api.builds(wrapWrap(function(builds){
                 builds.forEach((b) => b.selected = false);
                 app.builds = builds
-            }), repo.id);
+            }), repo.org, repo.name);
         },
         getBuild : function(build){
             api.build(wrapWrap(function(build){
