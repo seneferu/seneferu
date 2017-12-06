@@ -32,9 +32,13 @@ const SSHKEY = "sshkey"
 // CreateSSHKeySecret creates and ssh key in the Kubernetes cluster to be used for
 // cloning repositories
 func CreateSSHKeySecret(kubectl *kubernetes.Clientset, sshkey string) error {
+	key, err := base64.StdEncoding.DecodeString(string(sshkey))
+	if err != nil {
+		return errors.Wrap(err, "unable to decode base64 encoded sshkey, is it encoded?")
+	}
 	cm := v1.Secret{
 		ObjectMeta: meta_v1.ObjectMeta{Name: SSHKEY},
-		Data:       map[string][]byte{"id_rsa": []byte(sshkey)},
+		Data:       map[string][]byte{"id_rsa": key},
 	}
 	exsistingKey, _ := kubectl.CoreV1().Secrets("default").Get(SSHKEY, meta_v1.GetOptions{})
 	if exsistingKey != nil {
