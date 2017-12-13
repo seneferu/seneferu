@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "NODE_ENV=development webpack-dev-server --open --hot",
     "build": "NODE_ENV=production webpack --progress --hide-modules",
+    "dev-build": "NODE_ENV=development webpack --progress",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

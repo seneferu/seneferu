@@ -9,7 +9,9 @@
 
 <script>
 export default {
-    props: ['build'],
+    props: {
+        build : { type: Object }
+    },
     computed: {
         isSelected: function(){ return this.build.selected; }
     },
