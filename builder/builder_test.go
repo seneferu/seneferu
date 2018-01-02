@@ -8,6 +8,7 @@ import (
 	"github.com/sorenmat/pipeline/pipeline/frontend/yaml"
 
 	"fmt"
+
 	"gitlab.com/sorenmat/seneferu/model"
 )
 
