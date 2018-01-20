@@ -78,7 +78,7 @@ func (broker *Broker) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		// Server Sent Events compatible
 		fmt.Fprintf(rw, "data: %s\n\n", <-messageChan)
 
-		// Flush the data immediatly instead of buffering it for later.
+		// Flush the data immediately instead of buffering it for later.
 		flusher.Flush()
 	}
 

@@ -9,6 +9,7 @@ import (
 
 	"bytes"
 	"encoding/json"
+
 	"github.com/bmatsuo/go-jsontree"
 	"github.com/pkg/errors"
 )
@@ -119,6 +120,7 @@ func getHTTPSClient() *http.Client {
 	return client
 }
 
+// ReportBack sends the build status back to Github
 func ReportBack(state GithubStatus, owner, repo, sha, token string) error {
 	body, err := json.Marshal(&state)
 	if err != nil {
@@ -139,6 +141,8 @@ func ReportBack(state GithubStatus, owner, repo, sha, token string) error {
 	return nil
 }
 
+// GithubStatus is the payload we use to update the build information
+// on Github
 type GithubStatus struct {
 	State       string `json:"state"`
 	TargetURL   string `json:"target_url"`

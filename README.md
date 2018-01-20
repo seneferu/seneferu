@@ -1,5 +1,7 @@
 Simple Kubernetes based build
 
+[![Go Report Card](https://goreportcard.com/badge/gitlab.com/sorenmat/seneferu)](https://goreportcard.com/report/gitlab.com/sorenmat/seneferu)
+
 Named after the pharo that build 3 pyramids, because he was surely awesome... like this tools
 
 Was initial conceived in the Tradeshift Global Hackathon in 2017.
@@ -9,6 +11,7 @@ __DO NOT USE IN PRODUCTION__ or well that's up to you I guess.
 
 Build system that schedules build in a pod in a Kubernetes cluster.
 That way we can leverage Kubernetes for scaling and reliability.
+
 
 # Screenshot
 

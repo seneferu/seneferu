@@ -52,25 +52,7 @@ func CreateSSHKeySecret(kubectl *kubernetes.Clientset, sshkey string) error {
 	}
 }
 
-func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build *model.Build, repo *model.Repo, token string) error {
-	pod := &v1.Pod{Spec: v1.PodSpec{
-		RestartPolicy: "Never",
-	}}
-	buildUUID := "build-" + uuid.New()
-
-	buildNumber, err := service.GetNextBuildNumber() // fix me
-	build.Number = buildNumber
-	if err != nil {
-		return errors.Wrap(err, "unable to get next build number...")
-	}
-	err = service.SaveBuild(build)
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("unable to save build %v", build))
-	}
-
-	fmt.Println("Scheduling build: ", buildUUID)
-	pod.ObjectMeta.Name = buildUUID
-
+func volumemounts() []v1.Volume {
 	// shared directory for the build
 	vol1 := v1.Volume{}
 	vol1.Name = "shared-data"
@@ -92,13 +74,34 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 		Path: "/var/run/docker.sock",
 	}
 
-	pod.Spec.Volumes = []v1.Volume{
+	return []v1.Volume{
 		vol1,
 		sshvol,
 		dockerSocket,
 		volSSHAgent,
 	}
+}
 
+func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build *model.Build, repo *model.Repo, token string) error {
+	pod := &v1.Pod{Spec: v1.PodSpec{
+		RestartPolicy: "Never",
+	}}
+	buildUUID := "build-" + uuid.New()
+
+	buildNumber, err := service.GetNextBuildNumber() // fix me
+	build.Number = buildNumber
+	if err != nil {
+		return errors.Wrap(err, "unable to get next build number...")
+	}
+	err = service.SaveBuild(build)
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("unable to save build %v", build))
+	}
+
+	fmt.Println("Scheduling build: ", buildUUID)
+	pod.ObjectMeta.Name = buildUUID
+
+	pod.Spec.Volumes = volumemounts()
 	// add container to the pod
 	cfg, err := getConfigfile(build, token)
 	if err != nil {
