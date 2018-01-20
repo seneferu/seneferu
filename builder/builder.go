@@ -245,7 +245,7 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 
 	log.Println("Pod deleted!")
 	log.Println("*****************************************")
-	log.Println("Delcaring build done")
+	log.Println("Declaring build done")
 	log.Println("*****************************************")
 	return nil
 }
