@@ -16,7 +16,7 @@ func TestSaveAndLoadRepo(t *testing.T) {
 	}
 	org := "Seneferu"
 	name := "coderepo"
-	repo := &model.Repo{Org: org, Name: name, Url: "www.applejack.io"}
+	repo := &model.Repo{Org: org, Name: name, URL: "www.applejack.io"}
 	err = service.SaveRepo(repo)
 	assert.NoError(t, err)
 
@@ -37,7 +37,7 @@ func TestSaveAndLoadAllBuilds(t *testing.T) {
 	}
 	org := "Seneferu"
 	name := "coderepo-" + uuid.New()
-	repo := &model.Repo{Org: org, Name: name, Url: "www.applejack.io"}
+	repo := &model.Repo{Org: org, Name: name, URL: "www.applejack.io"}
 
 	b := &model.Build{Org: org, Name: name, Number: 1, Status: "Running"}
 

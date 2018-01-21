@@ -21,7 +21,7 @@ func TestStatusSpec(t *testing.T) {
 		handleStatus()(c)
 	}))
 	defer ts.Close()
-	runner.New(t, ts.URL).RunGlob(filepath.Glob("*.silk.md"))
+	runner.New(t, ts.URL).RunGlob(filepath.Glob("status.silk.md"))
 }
 func TestRepoSpec(t *testing.T) {
 	// start a server
@@ -30,7 +30,7 @@ func TestRepoSpec(t *testing.T) {
 		e := echo.New()
 		c := e.NewContext(r, w)
 		storage := memory.New()
-		storage.SaveRepo(&model.Repo{Name: "TestRepo", Org: "someorg", Url: "https://github.com/blabla/blabla"})
+		storage.SaveRepo(&model.Repo{Name: "TestRepo", Org: "someorg", URL: "https://github.com/blabla/blabla"})
 		handleFetchRepos(storage)(c)
 	}))
 	defer ts.Close()

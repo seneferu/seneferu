@@ -1,8 +1,5 @@
 image: golang:latest
 
-services:
-  - postgres:latest
-
 variables:
   REPO_NAME: gitlab.com/sorenmat/seneferu
   CONTAINER_RELEASE_IMAGE: registry.gitlab.com/sorenmat/seneferu:latest
@@ -17,6 +14,7 @@ before_script:
 stages:
     - validate
     - build
+    - coverage
     - release
 
 format:
@@ -30,6 +28,8 @@ vet:
 
 test:
   stage: validate
+  services:
+    - postgres:latest
   script:
      - go test -race ./...
 
@@ -51,6 +51,12 @@ compile-js:
     paths:
     - js/
 
+#coverage:
+#  image: golang:1.10-rc-stretch
+#  stage: coverage
+#  script:
+#    - go test -race -coverprofile=coverage.txt -covermode=atomic ./...
+#    - bash <(curl -s https://codecov.io/bash)
 release-image:
   stage: release
   image: docker:git
