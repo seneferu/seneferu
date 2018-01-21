@@ -44,9 +44,11 @@ func HandlePullRequest(payload interface{}, header webhooks.Header) {
 	fmt.Printf("%+v", pl)
 }
 
+// HandlePush handle push notifications from Github, this will then trigger a build in Seneferu
+// assuming the conditions for a build is met
 func HandlePush(service storage.Service, kubectl *kubernetes.Clientset, token string) webhooks.ProcessPayloadFunc {
 	return func(payload interface{}, header webhooks.Header) {
-		fmt.Println("Handling Push Request")
+		log.Println("Handling Push Request")
 
 		pl := payload.(github.PushPayload)
 
@@ -79,6 +81,7 @@ func HandlePush(service storage.Service, kubectl *kubernetes.Clientset, token st
 	}
 }
 
+// StartWebServer starts the web server for Seneferu handeling incoming request on the API
 func StartWebServer(db storage.Service, kubectl *kubernetes.Clientset, secret string, helmHost string, token string) {
 
 	// Github hook
@@ -124,12 +127,14 @@ func StartWebServer(db storage.Service, kubectl *kubernetes.Clientset, secret st
 
 var sockets = NewSockets()
 
+// Sockets structure holding the websockets
 type Sockets struct {
 	Add     chan *websocket.Conn
 	Remove  chan *websocket.Conn
 	sockets []*websocket.Conn
 }
 
+// GetSockets return all the registered web sockets
 func (s *Sockets) GetSockets() []*websocket.Conn {
 	return s.sockets
 }
@@ -149,6 +154,7 @@ func (s *Sockets) handle() {
 	}
 }
 
+// NewSockets create a new Sockets structure containing all the web hooks
 func NewSockets() *Sockets {
 	s := Sockets{}
 	s.Add = make(chan *websocket.Conn)

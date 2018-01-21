@@ -16,6 +16,7 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 	"github.com/sorenmat/pipeline/pipeline/frontend/yaml"
+	"gitlab.com/sorenmat/seneferu/builder/steps"
 	"gitlab.com/sorenmat/seneferu/github"
 	"gitlab.com/sorenmat/seneferu/model"
 	"gitlab.com/sorenmat/seneferu/storage"
@@ -45,11 +46,11 @@ func CreateSSHKeySecret(kubectl *kubernetes.Clientset, sshkey string) error {
 		log.Println("sshkey exsists, will try to update it")
 		_, err := kubectl.CoreV1().Secrets("default").Update(&cm)
 		return err
-	} else {
-		log.Println("sshkey mssing, will try to create it")
-		_, err := kubectl.CoreV1().Secrets("default").Create(&cm)
-		return err
 	}
+	log.Println("sshkey mssing, will try to create it")
+	_, err = kubectl.CoreV1().Secrets("default").Create(&cm)
+	return err
+
 }
 
 func volumemounts() []v1.Volume {
@@ -82,6 +83,9 @@ func volumemounts() []v1.Volume {
 	}
 }
 
+// ExecuteBuild main entry point for executing the build.
+// The will parse the config file, create and setup the steps and services
+// handle the execution of the containers in Kubernetes
 func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build *model.Build, repo *model.Repo, token string) error {
 	pod := &v1.Pod{Spec: v1.PodSpec{
 		RestartPolicy: "Never",
@@ -109,9 +113,9 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 	}
 	var prepareSteps []v1.Container
 	var buildSteps []v1.Container
-	prepareSteps = append(prepareSteps, createSSHAgentContainer())
-	prepareSteps = append(prepareSteps, createSSHKeyAdd())
-	prepareSteps = append(prepareSteps, createGitContainer(build))
+	prepareSteps = append(prepareSteps, steps.CreateSSHAgentContainer(shareddir))
+	prepareSteps = append(prepareSteps, steps.CreateSSHKeyAdd(shareddir))
+	prepareSteps = append(prepareSteps, steps.CreateGitContainer(shareddir, build))
 	x, err := createBuildSteps(build, cfg)
 	buildSteps = append(buildSteps, x...)
 	if err != nil {
@@ -321,7 +325,7 @@ func createBuildSteps(build *model.Build, cfg *yaml.Config) ([]v1.Container, err
 		if count > 0 {
 			cmds = append(cmds, waitForContainerCmd(fmt.Sprintf("build%v", count-1))) // wait for the previous build step
 		}
-		provider := "github.com"
+		provider := "github.com" //TODO this should be configurable at some point
 		workspace := shareddir + "/go/src/" + provider + "/" + projectName
 
 		cmds = append(cmds, fmt.Sprintf("cd %v", workspace))
@@ -375,6 +379,9 @@ func createBuildSteps(build *model.Build, cfg *yaml.Config) ([]v1.Container, err
 	return containers, nil
 }
 
+// createServiceSteps will create service steps for the build
+// a service is an external service to the build. This is mainly used for spinning up
+// databases and that sort of thing that the build could be dependend on
 func createServiceSteps(cfg *yaml.Config) ([]v1.Container, error) {
 
 	var containers []v1.Container
@@ -393,109 +400,6 @@ func createServiceSteps(cfg *yaml.Config) ([]v1.Container, error) {
 		containers = append(containers, c)
 	}
 	return containers, nil
-}
-
-func createGitContainer(build *model.Build) v1.Container {
-
-	projectName := build.Org + "/" + build.Name
-	url := "git@github.com:" + projectName
-	provider := "github.com"
-	workspace := shareddir + "/go/src/" + provider + "/" + projectName
-
-	sshTrustCmd := "ssh-keyscan -t rsa github.com > ~/.ssh/known_hosts"
-	cloneCmd := fmt.Sprintf("git clone %v %v", url, workspace)
-	curWDCmd := fmt.Sprintf("cd %v", workspace)
-	// TODO take the last element of the refs/head/init this is most likely not a good idea
-	checkoutCmd := fmt.Sprintf("git checkout %v", strings.Split(build.Ref, "/")[2])
-	fmt.Println(checkoutCmd)
-
-	doneCmd := "touch " + shareddir + "/git.done"
-	cmds := []string{waitForContainerCmd("ssh-key-add"), "mkdir ~/.ssh", sshTrustCmd, cloneCmd, curWDCmd, checkoutCmd, doneCmd}
-	return v1.Container{
-		Name:            "git",
-		Image:           "sorenmat/git:1.0",
-		ImagePullPolicy: v1.PullIfNotPresent,
-		VolumeMounts: []v1.VolumeMount{
-			{
-				Name:      "shared-data",
-				MountPath: shareddir,
-			},
-			{
-				Name:      "ssh-agent",
-				MountPath: "/.ssh-agent",
-			},
-		},
-
-		Command: []string{"/bin/sh", "-c", "echo $CI_SCRIPT | base64 -d |/bin/sh -e"},
-
-		Env: []v1.EnvVar{
-			{Name: "SSH_AUTH_SOCK", Value: "/.ssh-agent/socket"},
-			{Name: "CI_SCRIPT", Value: generateScript(cmds)},
-		},
-		Lifecycle: &v1.Lifecycle{
-			PreStop: &v1.Handler{Exec: &v1.ExecAction{Command: []string{"/usr/bin/touch", shareddir + "/git.done"}}},
-		},
-	}
-}
-
-func createSSHAgentContainer() v1.Container {
-	cmds := []string{"ssh-agent -a /.ssh-agent/socket -D"}
-	return v1.Container{
-		Name:            "ssh-agent",
-		Image:           "nardeas/ssh-agent",
-		ImagePullPolicy: v1.PullIfNotPresent,
-		VolumeMounts: []v1.VolumeMount{
-			{
-				Name:      "shared-data",
-				MountPath: shareddir,
-			},
-			{
-				Name:      "sshvolume",
-				MountPath: "/root/.ssh",
-			},
-			{
-				Name:      "ssh-agent",
-				MountPath: "/.ssh-agent",
-			},
-		},
-
-		Command: []string{"/bin/sh", "-c", "echo $CI_SCRIPT | base64 -d |/bin/sh -e"},
-
-		Env: []v1.EnvVar{
-			{Name: "CI_SCRIPT", Value: generateScript(cmds)},
-		},
-	}
-}
-
-func createSSHKeyAdd() v1.Container {
-	doneCmd := "touch " + shareddir + "/ssh-key-add.done"
-
-	cmds := []string{"ssh-add /root/.ssh/id_rsa", doneCmd}
-	return v1.Container{
-		Name:            "ssh-key-add",
-		Image:           "nardeas/ssh-agent",
-		ImagePullPolicy: v1.PullIfNotPresent,
-		VolumeMounts: []v1.VolumeMount{
-			{
-				Name:      "shared-data",
-				MountPath: shareddir,
-			},
-			{
-				Name:      "sshvolume",
-				MountPath: "/root/.ssh",
-			},
-			{
-				Name:      "ssh-agent",
-				MountPath: "/.ssh-agent",
-			},
-		},
-
-		Command: []string{"/bin/sh", "-c", "echo $CI_SCRIPT | base64 -d |/bin/sh -e"},
-
-		Env: []v1.EnvVar{
-			{Name: "CI_SCRIPT", Value: generateScript(cmds)},
-		},
-	}
 }
 
 func formatDuration(d time.Duration) string {
@@ -565,9 +469,8 @@ func waitForContainerTermination(kubectl *kubernetes.Clientset, b v1.Container, 
 			if v.Name == b.Name {
 				if v.State.Terminated != nil && v.State.Terminated.Reason != "" {
 					return v.State.Terminated.ExitCode, nil
-				} else {
-					time.Sleep(2 * time.Second)
 				}
+				time.Sleep(2 * time.Second)
 			}
 		}
 	}
