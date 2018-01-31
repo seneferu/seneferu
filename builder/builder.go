@@ -40,8 +40,8 @@ func CreateSSHKeySecret(kubectl *kubernetes.Clientset, sshkey string) error {
 		ObjectMeta: meta_v1.ObjectMeta{Name: SSHKEY},
 		Data:       map[string][]byte{"id_rsa": key},
 	}
-	exsistingKey, _ := kubectl.CoreV1().Secrets("default").Get(SSHKEY, meta_v1.GetOptions{})
-	if exsistingKey != nil {
+	exsistingKey, err := kubectl.CoreV1().Secrets("default").Get(SSHKEY, meta_v1.GetOptions{})
+	if err == nil && exsistingKey != nil {
 		log.Println("sshkey exsists, will try to update it")
 		_, err := kubectl.CoreV1().Secrets("default").Update(&cm)
 		return err
