@@ -186,3 +186,25 @@ func TestSaveAndLoadStepInfo(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "git", loadedStep.Name)
 }
+
+func TestGetNextBuildNumber(t *testing.T) {
+	service, err := New()
+	defer service.Close()
+	assert.NoError(t, err)
+
+	org := "Seneferu"
+	name := "repo-" + uuid.New()
+
+	buildnum,err := service.GetNextBuildNumber(org, name);
+	assert.NoError(t, err)
+	assert.Equal(t, 1, buildnum, "Build number did not start from 1")
+
+	build := &model.Build{Org: org, Name: name, Number: buildnum}
+	err = service.SaveBuild(build)
+	assert.NoError(t, err)
+
+	buildnum,err = service.GetNextBuildNumber(org, name);
+	assert.NoError(t, err)
+	assert.Equal(t, 2, buildnum, "Build number increments when build is saved")
+
+}

@@ -88,7 +88,7 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 	}}
 	buildUUID := "build-" + uuid.New()
 
-	buildNumber, err := service.GetNextBuildNumber() // fix me
+	buildNumber, err := service.GetNextBuildNumber(build.Org, build.Name)
 	build.Number = buildNumber
 	if err != nil {
 		return errors.Wrap(err, "unable to get next build number...")

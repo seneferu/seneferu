@@ -17,7 +17,7 @@ type Service interface {
 	SaveRepo(*model.Repo) error
 	SaveBuild(*model.Build) error
 	SaveStep(*model.Step) error
-	GetNextBuildNumber() (int, error)
+	GetNextBuildNumber(string, string) (int, error)
 	Close()
 }
 
