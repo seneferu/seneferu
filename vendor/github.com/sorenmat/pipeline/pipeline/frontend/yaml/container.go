@@ -57,7 +57,8 @@ type (
 		Secrets       Secrets                   `yaml:"secrets,omitempty"`
 		Constraints   Constraints               `yaml:"when,omitempty"`
 		Vargs         map[string]interface{}    `yaml:",inline"`
-		Coverage      string                    `yaml: "coverage,omitempty"`
+		Coverage      string                    `yaml:"coverage,omitempty"`
+		Args          []string                  `yaml:"args,omitempty"`
 	}
 )
 

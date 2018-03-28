@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"time"
 
+	"net/http"
+
 	"github.com/labstack/echo"
 	"gitlab.com/sorenmat/seneferu/builder"
 	"gitlab.com/sorenmat/seneferu/model"
@@ -20,7 +22,7 @@ import (
 
 // HandleRelease handles GitHub release events
 func HandleRelease(payload interface{}, header webhooks.Header) {
-	fmt.Println("Handling Release")
+	fmt.Println("Not Handling Release right now")
 
 	pl := payload.(github.ReleasePayload)
 
@@ -28,38 +30,33 @@ func HandleRelease(payload interface{}, header webhooks.Header) {
 	if pl.Release.Draft || pl.Release.Prerelease || pl.Release.TargetCommitish != "master" {
 		return
 	}
-
-	// Do whatever you want from here...
-	fmt.Printf("%+v", pl)
 }
 
 // HandlePullRequest handles GitHub pull_request events
 func HandlePullRequest(payload interface{}, header webhooks.Header) {
 
-	fmt.Println("Handling Pull Request")
+	fmt.Println("Not Handling Pull Request right now")
 
-	pl := payload.(github.PullRequestPayload)
-
-	// Do whatever you want from here...
-	fmt.Printf("%+v", pl)
 }
 
 func HandlePush(service storage.Service, kubectl *kubernetes.Clientset, token string) webhooks.ProcessPayloadFunc {
 	return func(payload interface{}, header webhooks.Header) {
-		fmt.Println("Handling Push Request")
+		log.Println("Handling Push Request")
 
 		pl := payload.(github.PushPayload)
 
 		repo, err := service.LoadByOrgAndName(pl.Repository.Owner.Name, pl.Repository.Name)
 		if err != nil {
+			log.Println("got an error, assuming we couldn't find the repository")
 			repo = &model.Repo{
 				Org:  pl.Repository.Owner.Name,
 				Name: pl.Repository.Name,
 			}
+			log.Printf("Trying to save %v\n", repo)
 			// this is odd move to a save function
 			err = service.SaveRepo(repo)
 			if err != nil {
-				fmt.Println(err)
+				log.Println(err)
 			}
 		}
 		build := &model.Build{
@@ -73,7 +70,7 @@ func HandlePush(service storage.Service, kubectl *kubernetes.Clientset, token st
 		}
 		err = builder.ExecuteBuild(kubectl, service, build, repo, token)
 		if err != nil {
-			panic(err) //TODO reconsider this
+			log.Printf("Build failure %v\n", err)
 		}
 
 	}
@@ -114,6 +111,11 @@ func StartWebServer(db storage.Service, kubectl *kubernetes.Clientset, secret st
 	e.Any("/webhook", func(c echo.Context) (err error) {
 		req := c.Request()
 		res := c.Response()
+		ct := req.Header.Get("Content-Type")
+		if ct != "application/json" {
+			log.Printf("Received payload on /webhook with unsupported mediatype, the request was %v", ct)
+			return fmt.Errorf(http.StatusText(415))
+		}
 		webhooks.Handler(hook).ServeHTTP(res, req)
 		//server.ServeHTTP(res, req)
 		return nil

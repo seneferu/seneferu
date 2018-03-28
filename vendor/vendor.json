@@ -693,16 +693,16 @@
 			"revisionTime": "2016-08-29T10:30:05Z"
 		},
 		{
-			"checksumSHA1": "2FweScbG38wfDVJvJnRwxC7qeeA=",
+			"checksumSHA1": "3pdfhaVVtJTs/zYEO6CY4hIDSgw=",
 			"path": "gopkg.in/go-playground/webhooks.v3",
-			"revision": "cd89a10b6412a823fe9d24f12dd7275d036f4f80",
-			"revisionTime": "2017-08-17T15:34:59Z"
+			"revision": "f2acbcde401467ded7701fbbf7eabd7a0bb6702d",
+			"revisionTime": "2018-03-21T15:13:12Z"
 		},
 		{
-			"checksumSHA1": "K6bo1bdY7x0L4a4YQTBWrS2QKC0=",
+			"checksumSHA1": "DDf2H1XcK87GT0GWh4fUWAEiNYg=",
 			"path": "gopkg.in/go-playground/webhooks.v3/github",
-			"revision": "cd89a10b6412a823fe9d24f12dd7275d036f4f80",
-			"revisionTime": "2017-08-17T15:34:59Z"
+			"revision": "f2acbcde401467ded7701fbbf7eabd7a0bb6702d",
+			"revisionTime": "2018-03-21T15:13:12Z"
 		},
 		{
 			"checksumSHA1": "pfQwQtWlFezJq0Viroa/L+v+yDM=",
