@@ -10,10 +10,10 @@ import (
 
 func TestSaveAndLoadRepo(t *testing.T) {
 	service, err := New()
-	defer service.Close()
 	if err != nil {
 		t.Error(err)
 	}
+	defer service.Close()
 	org := "Seneferu"
 	name := "coderepo"
 	repo := &model.Repo{Org: org, Name: name, URL: "www.applejack.io"}

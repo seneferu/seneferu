@@ -40,10 +40,40 @@ func New() (storage.Service, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open connection to database")
 	}
+	if err := db.Ping(); err != nil {
+		if strings.Contains(err.Error(), "database \"seneferu\" does not exist") {
+			err = createdb(host, user, password)
+			if err != nil {
+				return nil, err
+			}
+			// refresh connection
+			log.Println("Re-connecting to db")
+			db, err = sql.Open("postgres", "host="+host+" user="+user+" password="+password+" dbname=seneferu sslmode=disable")
+			if err != nil {
+				return nil, errors.Wrap(err, "unable to open connection to database")
+			}
+
+		} else {
+			return nil, errors.Wrap(err, "unable to ping database")
+		}
+	}
 
 	b := SQLDB{db: db}
 	b.syncSchema()
 	return &b, nil
+}
+func createdb(host, user, password string) error {
+	db, err := sql.Open("postgres", "host="+host+" user="+user+" password="+password+" sslmode=disable")
+	if err != nil {
+		return errors.Wrap(err, "unable to open connection to database")
+	}
+	defer db.Close()
+	_, err = db.Exec("CREATE DATABASE seneferu")
+	if err != nil {
+		return errors.Wrap(err, "Seemed like the database didn't exists and we couldn't create one either")
+	}
+	log.Println("Database created")
+	return nil
 }
 
 func guessMigrationPath() string {
