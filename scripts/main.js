@@ -1,13 +1,14 @@
 
 import Vue from 'vue'
-import api from './api.js'
+import App from './App.vue'
+
+import Api from './api.js'
 import app2 from './app.js'
 
-
-import App from './App.vue'
+Vue.use(Api);
 
 var app = new Vue({
     el: "#app",
-    render: (h) => h(App)
+    render: (h) => h(App) // Why
 });
 

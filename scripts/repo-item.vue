@@ -1,6 +1,6 @@
 <template>
     <li>
-        <div><a v-on:click='selectRepo'>{{ repo.org }}/{{ repo.name }}</a></div>
+        <div><a v-on:click="$emit('select_repo', repo)">{{ repo.org }}/{{ repo.name }}</a></div>
     </li>
 </template>
 
@@ -9,11 +9,7 @@ export default {
     props: {
         repo : { type: Object }
     },
-    methods: {
-        selectRepo: function(){
-            this.$emit('reposelected', this.repo)
-        }
-    }
+    methods: { }
 };
 </script>
 
