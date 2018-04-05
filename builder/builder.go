@@ -85,7 +85,13 @@ func volumemounts() []v1.Volume {
 func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build *model.Build, repo *model.Repo, token string) error {
 	pod := &v1.Pod{Spec: v1.PodSpec{
 		RestartPolicy: "Never",
-	}}
+	},
+		ObjectMeta: meta_v1.ObjectMeta{Labels: map[string]string{
+			"type": "build",
+			"app":  "seneferu-build",
+		}},
+	}
+
 	buildUUID := "build-" + uuid.New()
 
 	buildNumber, err := service.GetNextBuildNumber() // fix me
@@ -98,7 +104,7 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 		return errors.Wrap(err, fmt.Sprintf("unable to save build %v", build))
 	}
 
-	fmt.Println("Scheduling build: ", buildUUID)
+	log.Println("Scheduling build: ", buildUUID)
 	pod.ObjectMeta.Name = buildUUID
 
 	pod.Spec.Volumes = volumemounts()
@@ -107,11 +113,15 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 	if err != nil {
 		return errors.Wrap(err, "unable to handle buildconfig file")
 	}
+	if cfg.Workspace.Path == "" {
+		cfg.Workspace.Path = build.Name
+	}
 	var prepareSteps []v1.Container
 	var buildSteps []v1.Container
+
 	prepareSteps = append(prepareSteps, createSSHAgentContainer())
-	prepareSteps = append(prepareSteps, createSSHKeyAdd())
-	prepareSteps = append(prepareSteps, createGitContainer(build))
+	prepareSteps = append(prepareSteps, createGitContainer(build, cfg.Workspace.Path))
+
 	x, err := createBuildSteps(build, cfg)
 	buildSteps = append(buildSteps, x...)
 	if err != nil {
@@ -122,7 +132,8 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 	if err != nil {
 		return errors.Wrap(err, "unable to create service")
 	}
-	pod.Spec.Containers = append(pod.Spec.Containers, prepareSteps...)
+	// call the prepareSteps as init containers
+	pod.Spec.InitContainers = prepareSteps
 	pod.Spec.Containers = append(pod.Spec.Containers, services...)
 	pod.Spec.Containers = append(pod.Spec.Containers, buildSteps...)
 
@@ -173,7 +184,7 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 	}
 
 	// wait for all the build steps to finish
-	fmt.Println("Waiting for build steps...")
+	log.Println("Waiting for build steps...")
 	for _, b := range buildSteps {
 		waitForContainerTermination(kubectl, b, buildUUID)
 	}
@@ -273,7 +284,6 @@ func waitForContainerCmd(name string) string {
 func getConfigfile(build *model.Build, token string) (*yaml.Config, error) {
 	yamldata, err := github.GetConfigFile(build.Org, build.Name, build.Commit, token)
 	if err != nil {
-		fmt.Println(err)
 		log.Fatal(err)
 	}
 
@@ -306,25 +316,26 @@ func getCoverageFromLogs(build *model.Build, buildNumber int, testCoverage strin
 }
 
 func createBuildSteps(build *model.Build, cfg *yaml.Config) ([]v1.Container, error) {
-	fmt.Println("constructing build")
+	log.Println("constructing build")
 	count := 0
 
 	var containers []v1.Container
 	for _, cont := range cfg.Pipeline.Containers {
 
 		var cmds []string
-		projectName := build.Org + "/" + build.Name
 		// first command should be the wait for containers+
 		cmds = append(cmds, waitForContainerCmd("git"))
-		cmds = append(cmds, "ssh-keyscan -t rsa github.com > ~/.ssh/known_hosts")
 
 		if count > 0 {
 			cmds = append(cmds, waitForContainerCmd(fmt.Sprintf("build%v", count-1))) // wait for the previous build step
 		}
-		provider := "github.com"
-		workspace := shareddir + "/go/src/" + provider + "/" + projectName
 
-		cmds = append(cmds, fmt.Sprintf("cd %v", workspace))
+		workspace := cfg.Workspace.Path
+		if workspace == "" {
+			workspace = build.Name
+		}
+		workspace = shareddir + "/" + workspace
+
 		for _, v := range cont.Commands {
 			cmds = append(cmds, v)
 		}
@@ -352,17 +363,25 @@ func createBuildSteps(build *model.Build, cfg *yaml.Config) ([]v1.Container, err
 				},
 				{
 					Name:      "sshvolume",
-					MountPath: "/root/.ssh",
+					MountPath: "/root/.ssh", //TODO this needs to be fixed
+
 				},
 			},
-			Env:     buildEnv,
-			Command: []string{"/bin/sh", "-c", "echo $CI_SCRIPT | base64 -d |/bin/sh -e"},
-			//WorkingDir:,
+			Env:        buildEnv,
+			WorkingDir: workspace,
 			Lifecycle: &v1.Lifecycle{
-
-				PreStop: &v1.Handler{Exec: &v1.ExecAction{Command: []string{"/usr/bin/touch", fmt.Sprintf("%v/build%v.done", shareddir, count)}}},
+				PreStop: &v1.Handler{Exec: &v1.ExecAction{Command: []string{fmt.Sprintf("/usr/bin/touch %v/build%v.done", shareddir, count)}}},
 			},
 		}
+
+		if len(cont.Args) > 0 {
+			c.Args = cont.Args
+		}
+		// There we explicit commands defined in the build configuration file
+		if len(cont.Commands) > 0 {
+			c.Command = []string{"/bin/sh", "-c", "echo $CI_SCRIPT | base64 -d |/bin/sh -e"}
+		}
+
 		if cont.Privileged {
 			c.VolumeMounts = append(c.VolumeMounts, v1.VolumeMount{
 				Name:      "docker-socket",
@@ -395,22 +414,33 @@ func createServiceSteps(cfg *yaml.Config) ([]v1.Container, error) {
 	return containers, nil
 }
 
-func createGitContainer(build *model.Build) v1.Container {
+func createGitContainer(build *model.Build, workspace string) v1.Container {
 
 	projectName := build.Org + "/" + build.Name
 	url := "git@github.com:" + projectName
-	provider := "github.com"
-	workspace := shareddir + "/go/src/" + provider + "/" + projectName
+
+	workspace = shareddir + "/" + workspace
 
 	sshTrustCmd := "ssh-keyscan -t rsa github.com > ~/.ssh/known_hosts"
 	cloneCmd := fmt.Sprintf("git clone %v %v", url, workspace)
 	curWDCmd := fmt.Sprintf("cd %v", workspace)
 	// TODO take the last element of the refs/head/init this is most likely not a good idea
 	checkoutCmd := fmt.Sprintf("git checkout %v", strings.Split(build.Ref, "/")[2])
-	fmt.Println(checkoutCmd)
+	log.Println(checkoutCmd)
 
+	exportSSH := "SSH_AUTH_SOCK=/share/socket; export SSH_AUTH_SOCK"
 	doneCmd := "touch " + shareddir + "/git.done"
-	cmds := []string{waitForContainerCmd("ssh-key-add"), "mkdir ~/.ssh", sshTrustCmd, cloneCmd, curWDCmd, checkoutCmd, doneCmd}
+
+	sshcmds := []string{
+		"echo starting ssh-agent",
+		"eval $(ssh-agent -a /share/socket1)",
+		"mkdir ~/.ssh",
+		"echo trying ssh-add",
+		"cp /ssh/id_rsa ~/.ssh/id_rsa",
+		"ssh-add ~/.ssh/id_rsa",
+	}
+	cmds := append(sshcmds, exportSSH, sshTrustCmd, cloneCmd, curWDCmd, checkoutCmd, doneCmd)
+
 	return v1.Container{
 		Name:            "git",
 		Image:           "sorenmat/git:1.0",
@@ -424,6 +454,11 @@ func createGitContainer(build *model.Build) v1.Container {
 				Name:      "ssh-agent",
 				MountPath: "/.ssh-agent",
 			},
+			{
+				Name:      "sshvolume",
+				MountPath: "/ssh",
+				ReadOnly:  false,
+			},
 		},
 
 		Command: []string{"/bin/sh", "-c", "echo $CI_SCRIPT | base64 -d |/bin/sh -e"},
@@ -432,14 +467,21 @@ func createGitContainer(build *model.Build) v1.Container {
 			{Name: "SSH_AUTH_SOCK", Value: "/.ssh-agent/socket"},
 			{Name: "CI_SCRIPT", Value: generateScript(cmds)},
 		},
-		Lifecycle: &v1.Lifecycle{
-			PreStop: &v1.Handler{Exec: &v1.ExecAction{Command: []string{"/usr/bin/touch", shareddir + "/git.done"}}},
-		},
 	}
 }
 
 func createSSHAgentContainer() v1.Container {
-	cmds := []string{"ssh-agent -a /.ssh-agent/socket -D"}
+	doneCmd := "touch " + shareddir + "/ssh-key-add.done"
+	cmds := []string{
+		"echo starting ssh-agent",
+		"eval $(ssh-agent -a /share/socket)",
+		"echo trying ssh-add",
+		"cp /root/.ssh/id_rsa /share/id_rsa",
+		"ssh-add /share/id_rsa",
+		"echo 'marking step as done'",
+		doneCmd,
+	}
+
 	return v1.Container{
 		Name:            "ssh-agent",
 		Image:           "nardeas/ssh-agent",
@@ -452,37 +494,7 @@ func createSSHAgentContainer() v1.Container {
 			{
 				Name:      "sshvolume",
 				MountPath: "/root/.ssh",
-			},
-			{
-				Name:      "ssh-agent",
-				MountPath: "/.ssh-agent",
-			},
-		},
-
-		Command: []string{"/bin/sh", "-c", "echo $CI_SCRIPT | base64 -d |/bin/sh -e"},
-
-		Env: []v1.EnvVar{
-			{Name: "CI_SCRIPT", Value: generateScript(cmds)},
-		},
-	}
-}
-
-func createSSHKeyAdd() v1.Container {
-	doneCmd := "touch " + shareddir + "/ssh-key-add.done"
-
-	cmds := []string{"ssh-add /root/.ssh/id_rsa", doneCmd}
-	return v1.Container{
-		Name:            "ssh-key-add",
-		Image:           "nardeas/ssh-agent",
-		ImagePullPolicy: v1.PullIfNotPresent,
-		VolumeMounts: []v1.VolumeMount{
-			{
-				Name:      "shared-data",
-				MountPath: shareddir,
-			},
-			{
-				Name:      "sshvolume",
-				MountPath: "/root/.ssh",
+				ReadOnly:  false,
 			},
 			{
 				Name:      "ssh-agent",
