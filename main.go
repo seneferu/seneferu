@@ -1,6 +1,8 @@
 package main
 
 import (
+	"log"
+
 	"github.com/pkg/errors"
 	"gitlab.com/sorenmat/seneferu/builder"
 	"gitlab.com/sorenmat/seneferu/storage/sql"
@@ -9,15 +11,14 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"log"
 )
 
 var (
 	kubeCfgFile  = kingpin.Flag("kubeconfig", "Kubernetes Config File").Envar("KUBE_CONFIG").String()
 	githubSecret = kingpin.Flag("githubsecret", "Github secret token, needs to match the one on Github ").Envar("GITHUB_SECRET").Required().String()
-	helmHost     = kingpin.Flag("helmhost", "Hostname and port of the Helm host / tiller").String()
 	githubToken  = kingpin.Flag("githubToken", "Github access token, to access the API").Envar("GITHUB_TOKEN").Required().String()
 	sshkey       = kingpin.Flag("sshkey", "Github ssh key, used for cloning the repositories").Envar("SSH_KEY").Required().String()
+	targetURL    = kingpin.Flag("targetURL", "Base URL to use for reporting status to Github").Envar("TARGET_URL").Required().String()
 )
 
 func main() {
@@ -48,5 +49,5 @@ func main() {
 	}
 
 	log.Println("Starting web server...")
-	web.StartWebServer(service, kubectl, *githubSecret, *helmHost, *githubToken)
+	web.StartWebServer(service, kubectl, *githubSecret, *targetURL, *githubToken)
 }

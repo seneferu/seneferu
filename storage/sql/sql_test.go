@@ -144,7 +144,7 @@ func TestSaveAndLoadStep(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, loadedBuild.Number)
 
-	step := &model.Step{StepInfo: model.StepInfo{Org: org, Reponame: name, BuildNumber: 1, Name: "git"}}
+	step := &model.Step{StepInfo: model.StepInfo{Org: org, Reponame: name, BuildNumber: 1, Name: "git"}, Log: "something happend"}
 	err = service.SaveStep(step)
 	assert.NoError(t, err)
 
@@ -154,6 +154,7 @@ func TestSaveAndLoadStep(t *testing.T) {
 	assert.Equal(t, org, loadedStep.Org)
 	assert.Equal(t, name, loadedStep.Reponame)
 	assert.Equal(t, "git", loadedStep.Name)
+	assert.Equal(t, "something happend", loadedStep.Log)
 }
 
 func TestSaveAndLoadStepInfo(t *testing.T) {
@@ -195,7 +196,7 @@ func TestGetNextBuildNumber(t *testing.T) {
 	org := "Seneferu"
 	name := "repo-" + uuid.New()
 
-	buildnum,err := service.GetNextBuildNumber(org, name);
+	buildnum, err := service.GetNextBuildNumber(org, name)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, buildnum, "Build number did not start from 1")
 
@@ -203,7 +204,7 @@ func TestGetNextBuildNumber(t *testing.T) {
 	err = service.SaveBuild(build)
 	assert.NoError(t, err)
 
-	buildnum,err = service.GetNextBuildNumber(org, name);
+	buildnum, err = service.GetNextBuildNumber(org, name)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, buildnum, "Build number increments when build is saved")
 

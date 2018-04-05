@@ -2,12 +2,14 @@ package builder
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"strings"
 	"testing"
 
-	"github.com/sorenmat/pipeline/pipeline/frontend/yaml"
-
 	"fmt"
+
+	"github.com/sorenmat/pipeline/pipeline/frontend/yaml"
+	"github.com/stretchr/testify/assert"
 
 	"gitlab.com/sorenmat/seneferu/model"
 )
@@ -74,4 +76,26 @@ func TestCoverage(t *testing.T) {
 		t.Error("not able to get coverageResult ")
 	}
 	fmt.Print(coverageResult)
+}
+
+func TestDBLogWriter(t *testing.T) {
+	step := &model.Step{}
+	d := DBLogWriter{step: step}
+	d.Write([]byte("Hello world"))
+	d.Write([]byte("Hello world, from me"))
+	if step.Log != "Hello worldHello world, from me" {
+		t.Error(step)
+	}
+}
+
+func TestStepSerialize(t *testing.T) {
+	step := &model.Step{}
+	step.Name = "test"
+	step.Log = "Say "
+	d := DBLogWriter{step: step}
+	d.Write([]byte("Hello world"))
+	assert.Equal(t, "Say Hello world", step.Log)
+	b, err := json.Marshal(step)
+	assert.NoError(t, err)
+	assert.NotNil(t, b)
 }
