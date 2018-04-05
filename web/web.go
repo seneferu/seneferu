@@ -22,7 +22,7 @@ import (
 
 // HandleRelease handles GitHub release events
 func HandleRelease(payload interface{}, header webhooks.Header) {
-	fmt.Println("Not Handling Release right now")
+	log.Println("Not Handling Release right now")
 
 	pl := payload.(github.ReleasePayload)
 
@@ -34,12 +34,10 @@ func HandleRelease(payload interface{}, header webhooks.Header) {
 
 // HandlePullRequest handles GitHub pull_request events
 func HandlePullRequest(payload interface{}, header webhooks.Header) {
-
-	fmt.Println("Not Handling Pull Request right now")
-
+	log.Println("Not Handling Pull Request right now")
 }
 
-func HandlePush(service storage.Service, kubectl *kubernetes.Clientset, token string) webhooks.ProcessPayloadFunc {
+func HandlePush(service storage.Service, kubectl *kubernetes.Clientset, token string, targetURL string) webhooks.ProcessPayloadFunc {
 	return func(payload interface{}, header webhooks.Header) {
 		log.Println("Handling Push Request")
 
@@ -68,7 +66,7 @@ func HandlePush(service storage.Service, kubectl *kubernetes.Clientset, token st
 			Status:     "Created",
 			Timestamp:  time.Now(),
 		}
-		err = builder.ExecuteBuild(kubectl, service, build, repo, token)
+		err = builder.ExecuteBuild(kubectl, service, build, repo, token, targetURL)
 		if err != nil {
 			log.Printf("Build failure %v\n", err)
 		}
@@ -76,13 +74,13 @@ func HandlePush(service storage.Service, kubectl *kubernetes.Clientset, token st
 	}
 }
 
-func StartWebServer(db storage.Service, kubectl *kubernetes.Clientset, secret string, helmHost string, token string) {
+func StartWebServer(db storage.Service, kubectl *kubernetes.Clientset, secret string, targetURL string, token string) {
 
 	// Github hook
 	hook := github.New(&github.Config{Secret: secret})
 	hook.RegisterEvents(HandleRelease, github.ReleaseEvent)
 	hook.RegisterEvents(HandlePullRequest, github.PullRequestEvent)
-	hook.RegisterEvents(HandlePush(db, kubectl, token), github.PushEvent)
+	hook.RegisterEvents(HandlePush(db, kubectl, token, targetURL), github.PushEvent)
 
 	broker := webstream.NewServer()
 
@@ -97,7 +95,6 @@ func StartWebServer(db storage.Service, kubectl *kubernetes.Clientset, secret st
 	e.GET("/repo/:org/:id", handleFetchRepoData(db))
 	e.GET("/repo/:org/:id/builds", handleFetchBuilds(db))
 	e.GET("/repo/:org/:id/build/:buildid", handleFetchBuild(db))
-	e.GET("/helm/:release", handleHelm(helmHost))
 	//e.GET("/ws/:repo/build/:buildid/:step", logStream)
 	e.GET("/ws", func(c echo.Context) (err error) {
 		req := c.Request()
@@ -192,13 +189,13 @@ func handleFetchRepoData(db storage.Service) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		org := c.Param("org")
 		id := c.Param("id")
-		fmt.Printf("Id: %v,Org: %v\n", id, org)
+		log.Printf("Id: %v\tOrg: %v\n", id, org)
 		repo, err := db.LoadByOrgAndName(org, id)
 		if err != nil {
 			return err
 		}
 
-		fmt.Println("Found repo ", repo)
+		log.Println("Found repo ", repo)
 		err = c.JSON(200, repo)
 		if err != nil {
 			log.Println("unable to marshal json")
@@ -240,15 +237,15 @@ func handleFetchBuild(db storage.Service) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		org := c.Param("org")
 		id := c.Param("id")
-		fmt.Printf("Id: %v,Org: %v\n", id, org)
 		buildidStr := c.Param("buildid")
+		log.Printf("Id: %v\tOrg: %v\tBuildId: %v\n", id, org, buildidStr)
 
 		buildid, err := strconv.Atoi(buildidStr)
 		if err != nil {
 			return err
 		}
 
-		b, err := db.LoadStepInfos(org, id, buildid)
+		b, err := db.LoadSteps(org, id, buildid)
 		if err != nil {
 			return err
 		}

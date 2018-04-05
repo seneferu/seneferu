@@ -36,14 +36,14 @@ type StepInfo struct {
 // Step contains step information and the log entry
 type Step struct {
 	StepInfo
-	Log string `json:"build"`
+	Log string `json:"log"`
 }
 
 // Service is used to describe a service which is a thing builds can depend on
 // typically this could be postgres database or something like that
 type Service struct {
 	Name string `json:"name"`
-	Log  string `json:"build"`
+	Log  string `json:"log"`
 }
 
 // Repo basic information about a repository

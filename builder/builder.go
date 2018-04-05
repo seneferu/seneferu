@@ -82,7 +82,7 @@ func volumemounts() []v1.Volume {
 	}
 }
 
-func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build *model.Build, repo *model.Repo, token string) error {
+func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build *model.Build, repo *model.Repo, token string, targetURL string) error {
 	pod := &v1.Pod{Spec: v1.PodSpec{
 		RestartPolicy: "Never",
 	},
@@ -164,11 +164,15 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 	}
 
 	for _, b := range buildSteps {
-		step := &model.Step{StepInfo: model.StepInfo{Name: b.Name, Status: "Running"}}
+		step := &model.Step{StepInfo: model.StepInfo{Name: b.Name, Reponame: build.Name, BuildNumber: build.Number, Org: build.Org, Status: "Running"}}
 		build.Steps = append(build.Steps, step)
 		err = service.SaveBuild(build)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("unable to save build %v", build))
+		}
+		err = service.SaveStep(step)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("unable to save build step %v", b.Name))
 		}
 
 		go registerLog(service, repo.Org, repo.Name, step, buildUUID, b.Name, build, kubectl)
@@ -206,7 +210,9 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 				} else {
 					state = "error"
 				}
-				err := github.ReportBack(github.GithubStatus{State: state, Context: step.Name}, build.Org, build.Name, build.Commit, token)
+
+				callbackURL := fmt.Sprintf("%v/repo/%v/%v/build/%v", targetURL, build.Org, build.Name, build.Number)
+				err := github.ReportBack(github.GithubStatus{State: state, Context: step.Name, TargetURL: callbackURL}, build.Org, build.Name, build.Commit, token)
 				if err != nil {
 					log.Println("unable to report status back to github")
 				}
@@ -577,9 +583,8 @@ func waitForContainerTermination(kubectl *kubernetes.Clientset, b v1.Container, 
 			if v.Name == b.Name {
 				if v.State.Terminated != nil && v.State.Terminated.Reason != "" {
 					return v.State.Terminated.ExitCode, nil
-				} else {
-					time.Sleep(2 * time.Second)
 				}
+				time.Sleep(2 * time.Second)
 			}
 		}
 	}
@@ -589,14 +594,14 @@ func registerLog(service storage.Service, org string, reponame string, step *mod
 	//TODO THIS SEEMS WRONG
 	bw := &webstream.BucketWriter{Service: service, Build: build, RepoID: org + reponame, Step: name}
 	// start watching the logs in a separate go routine
-	err := saveLog(kubectl, buildUUID, name, bw)
+	err := saveLog(kubectl, buildUUID, name, bw, step)
 	if err != nil {
 		log.Println("Error while getting log ", err)
 	}
 	step.Status = "Done"
-	err = service.SaveBuild(build)
+	err = service.SaveStep(step)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("unable to save build %v", build))
+		return errors.Wrap(err, fmt.Sprintf("unable to save build step %v", step))
 	}
 	return nil
 }
@@ -605,7 +610,7 @@ func registerLogForService(service storage.Service, org string, reponame string,
 	//TODO THIS SEEMS WRONG
 	bw := &webstream.BucketWriter{Service: service, Build: build, RepoID: org + reponame, Step: name}
 	// get the log without waiting, since its a service and it should be running for ever...
-	err := saveLog(kubectl, buildUUID, name, bw)
+	err := saveLog(kubectl, buildUUID, name, bw, nil)
 	if err != nil {
 		log.Println("Error while getting log ", err)
 	}
@@ -631,7 +636,7 @@ func waitForContainer(kubectl *kubernetes.Clientset, buildname string) error {
 }
 
 // saveLog get the build of container in a running pod
-func saveLog(kubectl *kubernetes.Clientset, pod string, container string, bw *webstream.BucketWriter) error {
+func saveLog(kubectl *kubernetes.Clientset, pod string, container string, bw *webstream.BucketWriter, step *model.Step) error {
 	log.Printf("Trying to get log for %v %v\n", pod, container)
 	req := kubectl.CoreV1().Pods("default").GetLogs(pod, &v1.PodLogOptions{
 		Container: container,
@@ -643,9 +648,22 @@ func saveLog(kubectl *kubernetes.Clientset, pod string, container string, bw *we
 		return errors.Wrap(err, "unable to get stream: ")
 	}
 	defer readCloser.Close()
-	_, err = io.Copy(io.MultiWriter(bw, os.Stdout), readCloser) // Tee something
+	dbw := DBLogWriter{step: step}
+	_, err = io.Copy(io.MultiWriter(bw, os.Stdout, dbw), readCloser)
 	if err != nil {
 		return errors.Wrap(err, "unable to copy stream to stdout")
 	}
 	return err
+}
+
+type DBLogWriter struct {
+	step *model.Step
+}
+
+func (d DBLogWriter) Write(p []byte) (n int, err error) {
+	if d.step == nil {
+		return 0, nil
+	}
+	d.step.Log = d.step.Log + string(p)
+	return len(p), nil
 }

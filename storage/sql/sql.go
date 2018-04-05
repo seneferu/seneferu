@@ -226,18 +226,18 @@ func (r *SQLDB) LoadStep(org, reponame string, build int, stepname string) (*mod
 
 }
 
-// LoadStepInfos loads all step informations in a repo based on the repo name, build id and step name
-func (r *SQLDB) LoadStepInfos(org string, name string, build int) ([]*model.StepInfo, error) {
-	result := make([]*model.StepInfo, 0)
-	rows, err := r.db.Query("SELECT org, reponame, buildnumber,name,status,exitcode FROM steps WHERE ORG=$1 AND REPONAME=$2 AND buildnumber=$3", org, name, build)
+// LoadSteps loads all step informations in a repo based on the repo name, build id and step name
+func (r *SQLDB) LoadSteps(org string, name string, build int) ([]*model.Step, error) {
+	result := make([]*model.Step, 0)
+	rows, err := r.db.Query("SELECT org, reponame, buildnumber,name,status,exitcode,log FROM steps WHERE ORG=$1 AND REPONAME=$2 AND buildnumber=$3", org, name, build)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		var stepinfo model.StepInfo
-		err = rows.Scan(&stepinfo.Org, &stepinfo.Reponame, &stepinfo.BuildNumber, &stepinfo.Name, &stepinfo.Status, &stepinfo.ExitCode)
+		var stepinfo model.Step
+		err = rows.Scan(&stepinfo.Org, &stepinfo.Reponame, &stepinfo.BuildNumber, &stepinfo.Name, &stepinfo.Status, &stepinfo.ExitCode, &stepinfo.Log)
 		if err != nil {
 			return nil, err
 		}
@@ -325,13 +325,10 @@ func (r *SQLDB) SaveStep(step *model.Step) error {
 	if step.BuildNumber <= 0 {
 		return fmt.Errorf("a build number larger then 0 is required")
 	}
-	if step.BuildNumber <= 0 {
-		return fmt.Errorf("the step must have a build number larger then 0")
-	}
 
 	stmt, err := r.db.Prepare("INSERT INTO steps(buildnumber, reponame, name, log, status, exitcode,org) " +
 		"VALUES($1, $2, $3, $4, $5, $6,$7) ON CONFLICT (buildnumber, reponame, name,org) DO UPDATE SET " +
-		"buildnumber=$1, reponame=$2,name=$3,log=$4,status=$5,exitcode=$6,org=$7 WHERE steps.buildnumber=$1 AND steps.reponame=$2 AND steps.name=$3 AND steps.org=$4")
+		"buildnumber=$1, reponame=$2, name=$3, log=$4, status=$5, exitcode=$6, org=$7 WHERE steps.buildnumber=$1 AND steps.reponame=$2 AND steps.name=$3 AND steps.org=$7")
 
 	if err != nil {
 		log.Println(err)

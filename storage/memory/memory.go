@@ -35,7 +35,7 @@ func (m *MemStorage) LoadBuild(org string, name string, buildid int) (*model.Bui
 func (m *MemStorage) LoadStep(org string, name string, buildid int, stepname string) (*model.Step, error) {
 	return nil, nil
 }
-func (m *MemStorage) LoadStepInfos(org string, name string, build int) ([]*model.StepInfo, error) {
+func (m *MemStorage) LoadSteps(org string, name string, build int) ([]*model.Step, error) {
 	return nil, nil
 }
 func (m *MemStorage) LoadStepInfo(org string, name string, stepname string, build int) (*model.StepInfo, error) {
