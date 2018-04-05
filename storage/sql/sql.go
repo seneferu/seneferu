@@ -346,11 +346,28 @@ func (r *SQLDB) SaveStep(step *model.Step) error {
 }
 
 // GetNextBuildNumber returns the next available build number, this is currently globally unique
-func (r *SQLDB) GetNextBuildNumber() (int, error) {
-	buildNumber := 1
-	return buildNumber, nil
+func (r *SQLDB) GetNextBuildNumber(org, repo_name string) (int, error) {
+	if org == "" {
+		return -1,fmt.Errorf("org is required for the build struct")
+	}
+	if repo_name == "" {
+		return -1,fmt.Errorf("name is required for the build struct")
+	}
 
+	stmt, err := r.db.Prepare("INSERT INTO builds(org,name,number) " +
+		"VALUES($1::VARCHAR, $2::VARCHAR, (SELECT COALESCE(MAX(number)+1, 1) AS number FROM builds WHERE org=$1 AND name=$2)) RETURNING number")
+	defer stmt.Close()
+	if err != nil {
+		// To log or not to log, thats the question?
+		return -1, err;
+	}
+
+	build_num := 0;
+	err = stmt.QueryRow(org, repo_name).Scan(&build_num);
+
+	return build_num, err;
 }
+
 
 // Close the connection to the database
 func (r SQLDB) Close() {
