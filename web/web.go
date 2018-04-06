@@ -12,7 +12,6 @@ import (
 	"gitlab.com/sorenmat/seneferu/builder"
 	"gitlab.com/sorenmat/seneferu/model"
 	"gitlab.com/sorenmat/seneferu/storage"
-	"gitlab.com/sorenmat/seneferu/webstream"
 	"golang.org/x/net/websocket"
 	"gopkg.in/go-playground/webhooks.v3"
 	"gopkg.in/go-playground/webhooks.v3/github"
@@ -82,8 +81,6 @@ func StartWebServer(db storage.Service, kubectl *kubernetes.Clientset, secret st
 	hook.RegisterEvents(HandlePullRequest, github.PullRequestEvent)
 	hook.RegisterEvents(HandlePush(db, kubectl, token, targetURL, dockerRegHost), github.PushEvent)
 
-	broker := webstream.NewServer()
-
 	e := echo.New()
 
 	e.Static("/styles", "styles")
@@ -95,14 +92,6 @@ func StartWebServer(db storage.Service, kubectl *kubernetes.Clientset, secret st
 	e.GET("/repo/:org/:id", handleFetchRepoData(db))
 	e.GET("/repo/:org/:id/builds", handleFetchBuilds(db))
 	e.GET("/repo/:org/:id/build/:buildid", handleFetchBuild(db))
-	//e.GET("/ws/:repo/build/:buildid/:step", logStream)
-	e.GET("/ws", func(c echo.Context) (err error) {
-		req := c.Request()
-		res := c.Response()
-
-		broker.ServeHTTP(res, req)
-		return nil
-	})
 
 	// handle github web hook
 	e.Any("/webhook", func(c echo.Context) (err error) {
