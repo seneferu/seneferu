@@ -51,7 +51,7 @@ func (m *MemStorage) SaveBuild(*model.Build) error {
 func (m *MemStorage) SaveStep(*model.Step) error {
 	return nil
 }
-func (m *MemStorage) GetNextBuildNumber() (int, error) {
+func (m *MemStorage) GetNextBuildNumber(string, string) (int, error) {
 	return 1, nil
 }
 func (m *MemStorage) Close() {
