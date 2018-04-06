@@ -14,11 +14,12 @@ import (
 )
 
 var (
-	kubeCfgFile  = kingpin.Flag("kubeconfig", "Kubernetes Config File").Envar("KUBE_CONFIG").String()
-	githubSecret = kingpin.Flag("githubsecret", "Github secret token, needs to match the one on Github ").Envar("GITHUB_SECRET").Required().String()
-	githubToken  = kingpin.Flag("githubToken", "Github access token, to access the API").Envar("GITHUB_TOKEN").Required().String()
-	sshkey       = kingpin.Flag("sshkey", "Github ssh key, used for cloning the repositories").Envar("SSH_KEY").Required().String()
-	targetURL    = kingpin.Flag("targetURL", "Base URL to use for reporting status to Github").Envar("TARGET_URL").Required().String()
+	kubeCfgFile   = kingpin.Flag("kubeconfig", "Kubernetes Config File").Envar("KUBE_CONFIG").String()
+	githubSecret  = kingpin.Flag("githubsecret", "Github secret token, needs to match the one on Github ").Envar("GITHUB_SECRET").Required().String()
+	githubToken   = kingpin.Flag("githubToken", "Github access token, to access the API").Envar("GITHUB_TOKEN").Required().String()
+	sshkey        = kingpin.Flag("sshkey", "Github ssh key, used for cloning the repositories").Envar("SSH_KEY").Required().String()
+	targetURL     = kingpin.Flag("targetURL", "Base URL to use for reporting status to Github").Envar("TARGET_URL").Required().String()
+	dockerRegHost = kingpin.Flag("dockerhost", "Host name of a private docker registry").Envar("DOCKER_REGISTRY_HOST").String()
 )
 
 func main() {
@@ -49,5 +50,5 @@ func main() {
 	}
 
 	log.Println("Starting web server...")
-	web.StartWebServer(service, kubectl, *githubSecret, *targetURL, *githubToken)
+	web.StartWebServer(service, kubectl, *githubSecret, *targetURL, *githubToken, *dockerRegHost)
 }

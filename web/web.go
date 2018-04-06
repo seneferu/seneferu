@@ -37,7 +37,7 @@ func HandlePullRequest(payload interface{}, header webhooks.Header) {
 	log.Println("Not Handling Pull Request right now")
 }
 
-func HandlePush(service storage.Service, kubectl *kubernetes.Clientset, token string, targetURL string) webhooks.ProcessPayloadFunc {
+func HandlePush(service storage.Service, kubectl *kubernetes.Clientset, token string, targetURL string, dockerRegHost string) webhooks.ProcessPayloadFunc {
 	return func(payload interface{}, header webhooks.Header) {
 		log.Println("Handling Push Request")
 
@@ -66,7 +66,7 @@ func HandlePush(service storage.Service, kubectl *kubernetes.Clientset, token st
 			Status:     "Created",
 			Timestamp:  time.Now(),
 		}
-		err = builder.ExecuteBuild(kubectl, service, build, repo, token, targetURL)
+		err = builder.ExecuteBuild(kubectl, service, build, repo, token, targetURL, dockerRegHost)
 		if err != nil {
 			log.Printf("Build failure %v\n", err)
 		}
@@ -74,13 +74,13 @@ func HandlePush(service storage.Service, kubectl *kubernetes.Clientset, token st
 	}
 }
 
-func StartWebServer(db storage.Service, kubectl *kubernetes.Clientset, secret string, targetURL string, token string) {
+func StartWebServer(db storage.Service, kubectl *kubernetes.Clientset, secret string, targetURL string, token string, dockerRegHost string) {
 
 	// Github hook
 	hook := github.New(&github.Config{Secret: secret})
 	hook.RegisterEvents(HandleRelease, github.ReleaseEvent)
 	hook.RegisterEvents(HandlePullRequest, github.PullRequestEvent)
-	hook.RegisterEvents(HandlePush(db, kubectl, token, targetURL), github.PushEvent)
+	hook.RegisterEvents(HandlePush(db, kubectl, token, targetURL, dockerRegHost), github.PushEvent)
 
 	broker := webstream.NewServer()
 
