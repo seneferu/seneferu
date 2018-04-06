@@ -19,7 +19,6 @@ import (
 	"gitlab.com/sorenmat/seneferu/github"
 	"gitlab.com/sorenmat/seneferu/model"
 	"gitlab.com/sorenmat/seneferu/storage"
-	"gitlab.com/sorenmat/seneferu/webstream"
 	"k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -74,15 +73,21 @@ func volumemounts() []v1.Volume {
 		Path: "/var/run/docker.sock",
 	}
 
+	// Secret containing the docker registry certificates
+	dockerSecrets := v1.Volume{}
+	dockerSecrets.Name = "docker-secrets"
+	dockerSecrets.Secret = &v1.SecretVolumeSource{SecretName: "seneferu-docker", DefaultMode: &perm}
+
 	return []v1.Volume{
 		vol1,
 		sshvol,
 		dockerSocket,
 		volSSHAgent,
+		dockerSecrets,
 	}
 }
 
-func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build *model.Build, repo *model.Repo, token string, targetURL string) error {
+func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build *model.Build, repo *model.Repo, token string, targetURL string, dockerRegHost string) error {
 	pod := &v1.Pod{Spec: v1.PodSpec{
 		RestartPolicy: "Never",
 	},
@@ -129,6 +134,8 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 	}
 
 	services, err := createServiceSteps(cfg)
+	// Add the docker containers that writes in shardir to create the socket
+	services = append(services, createDockerContainer(dockerRegHost))
 	if err != nil {
 		return errors.Wrap(err, "unable to create service")
 	}
@@ -353,6 +360,7 @@ func createBuildSteps(build *model.Build, cfg *yaml.Config) ([]v1.Container, err
 		buildEnv = append(buildEnv, v1.EnvVar{Name: "CI_SCRIPT", Value: generateScript(cmds)})
 		buildEnv = append(buildEnv, v1.EnvVar{Name: "GOPATH", Value: shareddir + "/go"})
 		buildEnv = append(buildEnv, v1.EnvVar{Name: "GIT_REF", Value: build.Commit})
+		buildEnv = append(buildEnv, v1.EnvVar{Name: "DOCKER_HOST", Value: fmt.Sprintf("unix:///%v/docker.sock", shareddir)})
 
 		for key, value := range cont.Environment {
 			buildEnv = append(buildEnv, v1.EnvVar{Name: key, Value: value})
@@ -516,6 +524,26 @@ func createSSHAgentContainer() v1.Container {
 	}
 }
 
+func createDockerContainer(dockerRegHost string) v1.Container {
+	priv := true
+	return v1.Container{
+		Name:            "docker",
+		Image:           "docker:17-dind",
+		ImagePullPolicy: v1.PullIfNotPresent,
+		VolumeMounts: []v1.VolumeMount{
+			{
+				Name:      "shared-data",
+				MountPath: "/var/run",
+			},
+			{
+				Name:      "docker-secrets",
+				MountPath: "/etc/docker/certs.d/" + dockerRegHost,
+			},
+		},
+		SecurityContext: &v1.SecurityContext{Privileged: &priv},
+	}
+}
+
 func formatDuration(d time.Duration) string {
 	// taken from github.com/hako/durafmt
 	var (
@@ -591,10 +619,8 @@ func waitForContainerTermination(kubectl *kubernetes.Clientset, b v1.Container, 
 }
 
 func registerLog(service storage.Service, org string, reponame string, step *model.Step, buildUUID string, name string, build *model.Build, kubectl *kubernetes.Clientset) error {
-	//TODO THIS SEEMS WRONG
-	bw := &webstream.BucketWriter{Service: service, Build: build, RepoID: org + reponame, Step: name}
 	// start watching the logs in a separate go routine
-	err := saveLog(kubectl, buildUUID, name, bw, step)
+	err := saveLog(kubectl, buildUUID, name, step)
 	if err != nil {
 		log.Println("Error while getting log ", err)
 	}
@@ -607,10 +633,8 @@ func registerLog(service storage.Service, org string, reponame string, step *mod
 }
 
 func registerLogForService(service storage.Service, org string, reponame string, buildUUID string, name string, build *model.Build, kubectl *kubernetes.Clientset) error {
-	//TODO THIS SEEMS WRONG
-	bw := &webstream.BucketWriter{Service: service, Build: build, RepoID: org + reponame, Step: name}
 	// get the log without waiting, since its a service and it should be running for ever...
-	err := saveLog(kubectl, buildUUID, name, bw, nil)
+	err := saveLog(kubectl, buildUUID, name, nil)
 	if err != nil {
 		log.Println("Error while getting log ", err)
 	}
@@ -636,7 +660,7 @@ func waitForContainer(kubectl *kubernetes.Clientset, buildname string) error {
 }
 
 // saveLog get the build of container in a running pod
-func saveLog(kubectl *kubernetes.Clientset, pod string, container string, bw *webstream.BucketWriter, step *model.Step) error {
+func saveLog(kubectl *kubernetes.Clientset, pod string, container string, step *model.Step) error {
 	log.Printf("Trying to get log for %v %v\n", pod, container)
 	req := kubectl.CoreV1().Pods("default").GetLogs(pod, &v1.PodLogOptions{
 		Container: container,
@@ -649,7 +673,7 @@ func saveLog(kubectl *kubernetes.Clientset, pod string, container string, bw *we
 	}
 	defer readCloser.Close()
 	dbw := DBLogWriter{step: step}
-	_, err = io.Copy(io.MultiWriter(bw, os.Stdout, dbw), readCloser)
+	_, err = io.Copy(io.MultiWriter(os.Stdout, dbw), readCloser)
 	if err != nil {
 		return errors.Wrap(err, "unable to copy stream to stdout")
 	}

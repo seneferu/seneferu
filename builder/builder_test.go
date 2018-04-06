@@ -99,3 +99,10 @@ func TestStepSerialize(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, b)
 }
+
+func TestCreateDockerContainer(t *testing.T) {
+	c := createDockerContainer("some.host.com")
+	assert.Equal(t, "/var/run", c.VolumeMounts[0].MountPath)
+	assert.Equal(t, "/etc/docker/certs.d/some.host.com", c.VolumeMounts[1].MountPath)
+	assert.True(t, *c.SecurityContext.Privileged)
+}
