@@ -187,7 +187,7 @@ func (r *SQLDB) LoadBuild(org, name string, build int) (*model.Build, error) {
 func (r *SQLDB) LoadBuilds(org, name string) ([]*model.Build, error) {
 	bb := make([]*model.Build, 0)
 
-	rows, err := r.db.Query("SELECT org,name,number,comitters,status,commit,coverage,duration FROM builds WHERE ORG=$1 AND NAME=$2", org, name)
+	rows, err := r.db.Query("SELECT org,name,number,comitters,created,status,commit,coverage,duration FROM builds WHERE ORG=$1 AND NAME=$2", org, name)
 	if err != nil {
 		return bb, err
 	}
@@ -196,7 +196,7 @@ func (r *SQLDB) LoadBuilds(org, name string) ([]*model.Build, error) {
 	for rows.Next() {
 		b := &model.Build{}
 		var c string
-		err = rows.Scan(&b.Org, &b.Name, &b.Number, &c, &b.Status, &b.Commit, &b.Coverage, &b.Duration)
+		err = rows.Scan(&b.Org, &b.Name, &b.Number, &c, &b.Timestamp, &b.Status, &b.Commit, &b.Coverage, &b.Duration)
 		b.Committers = strings.Split(c, ",")
 		bb = append(bb, b)
 		if err != nil {
