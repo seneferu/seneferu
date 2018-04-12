@@ -1,6 +1,6 @@
 <template>
     <li class='builditem'>
-        <a v-on:click="selectBuild" :class="[status_class(build), { active: isSelected }]">
+        <a v-on:click="$emit('select_build', build)" :class="[status_class(build), { active: isSelected }]">
             <span v-bind:class="['glyphicon', status_icon(build) ]"></span>
             <span>{{ time(build.timestamp) }}</span>
         </a>
@@ -13,12 +13,11 @@ export default {
         build : { type: Object }
     },
     computed: {
-        isSelected: function(){ return this.build.selected; }
+        isSelected: function(){ 
+            return this.build.selected;
+        }
     },
     methods: {
-        selectBuild: function(){
-            this.$emit('buildselected', this.build);
-        },
         time: function(timestamp){
             return timestamp.substring(0, 16).replace('T', ' ');
         },
@@ -44,3 +43,6 @@ export default {
     }
 };
 </script>
+
+<style>
+</style>
