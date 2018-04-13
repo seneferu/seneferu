@@ -10,12 +10,12 @@ import (
 	"regexp"
 	"time"
 
-	"strconv"
 	"strings"
 
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 	"github.com/sorenmat/pipeline/pipeline/frontend/yaml"
+	"gitlab.com/sorenmat/seneferu/builder/date"
 	"gitlab.com/sorenmat/seneferu/github"
 	"gitlab.com/sorenmat/seneferu/model"
 	"gitlab.com/sorenmat/seneferu/storage"
@@ -66,13 +66,6 @@ func volumemounts() []v1.Volume {
 	perm := int32(0400)
 	sshvol.Secret = &v1.SecretVolumeSource{SecretName: SSHKEY, DefaultMode: &perm}
 
-	dockerSocket := v1.Volume{
-		Name: "docker-socket",
-	}
-	dockerSocket.HostPath = &v1.HostPathVolumeSource{
-		Path: "/var/run/docker.sock",
-	}
-
 	// Secret containing the docker registry certificates
 	dockerSecrets := v1.Volume{}
 	dockerSecrets.Name = "docker-secrets"
@@ -81,7 +74,6 @@ func volumemounts() []v1.Volume {
 	return []v1.Volume{
 		vol1,
 		sshvol,
-		dockerSocket,
 		volSSHAgent,
 		dockerSecrets,
 	}
@@ -194,6 +186,8 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 		go registerLogForService(service, repo.Org, repo.Name, buildUUID, b.Name, build, kubectl)
 	}
 
+	//perhaps wait for pod to be in Completed or Error state
+
 	// wait for all the build steps to finish
 	log.Println("Waiting for build steps...")
 	for _, b := range buildSteps {
@@ -252,7 +246,7 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 
 	// calculate the time the build took
 	t := time.Now().Sub(build.Timestamp)
-	build.Duration = formatDuration(t)
+	build.Duration = format.Duration(t)
 
 	err = service.SaveBuild(build)
 	if err != nil {
@@ -396,12 +390,6 @@ func createBuildSteps(build *model.Build, cfg *yaml.Config) ([]v1.Container, err
 			c.Command = []string{"/bin/sh", "-c", "echo $CI_SCRIPT | base64 -d |/bin/sh -e"}
 		}
 
-		if cont.Privileged {
-			c.VolumeMounts = append(c.VolumeMounts, v1.VolumeMount{
-				Name:      "docker-socket",
-				MountPath: "/var/run/docker.sock",
-			})
-		}
 		containers = append(containers, c)
 		count++
 	}
@@ -417,12 +405,7 @@ func createServiceSteps(cfg *yaml.Config) ([]v1.Container, error) {
 			ImagePullPolicy: v1.PullIfNotPresent,
 			Image:           serv.Image,
 		}
-		if serv.Privileged {
-			c.VolumeMounts = append(c.VolumeMounts, v1.VolumeMount{
-				Name:      "docker-socket",
-				MountPath: "/var/run/docker.sock",
-			})
-		}
+		// handle docker in th services..
 		containers = append(containers, c)
 	}
 	return containers, nil
@@ -540,65 +523,10 @@ func createDockerContainer(dockerRegHost string) v1.Container {
 				MountPath: "/etc/docker/certs.d/" + dockerRegHost,
 			},
 		},
-		SecurityContext: &v1.SecurityContext{Privileged: &priv},
+		SecurityContext: &v1.SecurityContext{
+			Privileged: &priv,
+		},
 	}
-}
-
-func formatDuration(d time.Duration) string {
-	// taken from github.com/hako/durafmt
-	var (
-		units = []string{"days", "hours", "minutes", "seconds"}
-	)
-
-	var duration string
-	input := d.String()
-
-	// Convert duration.
-	seconds := int(d.Seconds()) % 60
-	minutes := int(d.Minutes()) % 60
-	hours := int(d.Hours()) % 24
-	days := int(d/(24*time.Hour)) % 365 % 7
-	// Create a map of the converted duration time.
-	durationMap := map[string]int{
-		"seconds": seconds,
-		"minutes": minutes,
-		"hours":   hours,
-		"days":    days,
-	}
-
-	// Construct duration string.
-	for _, u := range units {
-		v := durationMap[u]
-		strval := strconv.Itoa(v)
-		switch {
-		// add to the duration string if v > 1.
-		case v > 1:
-			duration += strval + " " + u + " "
-			// remove the plural 's', if v is 1.
-		case v == 1:
-			duration += strval + " " + strings.TrimRight(u, "s") + " "
-			// omit any value with 0s or 0.
-		case d.String() == "0" || d.String() == "0s":
-			// note: milliseconds and minutes have the same suffix (m)
-			// so we have to check if the units match with the suffix.
-
-			// check for a suffix that is NOT the milliseconds suffix.
-			if strings.HasSuffix(input, string(u[0])) && !strings.Contains(input, "ms") {
-				// if it happens that the units are milliseconds, skip.
-				if u == "milliseconds" {
-					continue
-				}
-				duration += strval + " " + u
-			}
-			break
-			// omit any value with 0.
-		case v == 0:
-			continue
-		}
-	}
-	// trim any remaining spaces.
-	duration = strings.TrimSpace(duration)
-	return duration
 }
 
 func waitForContainerTermination(kubectl *kubernetes.Clientset, b v1.Container, buildUUID string) (int32, error) {
