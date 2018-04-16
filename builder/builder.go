@@ -272,10 +272,7 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 func generateScript(commands []string) string {
 	var buf bytes.Buffer
 	for _, command := range commands {
-		buf.WriteString(fmt.Sprintf(`
-%s
-`, command,
-		))
+		buf.WriteString(fmt.Sprintf("echo '%s'\n%s\n", command, command))
 	}
 	return base64.StdEncoding.EncodeToString([]byte(buf.String()))
 }
@@ -328,7 +325,12 @@ func createBuildSteps(build *model.Build, cfg *yaml.Config) ([]v1.Container, err
 
 	var containers []v1.Container
 	for _, cont := range cfg.Pipeline.Containers {
-
+		// strip "refs/heads/"
+		branch := strings.Replace(build.Ref, "refs/heads/", "", -1)
+		if !cont.Constraints.Branch.Match(branch) {
+			log.Printf("Branch %v didn't meet condition of %v\n", build.Ref, cont.Constraints.Branch)
+			continue
+		}
 		var cmds []string
 		// first command should be the wait for containers+
 		cmds = append(cmds, waitForContainerCmd("git"))
@@ -354,6 +356,7 @@ func createBuildSteps(build *model.Build, cfg *yaml.Config) ([]v1.Container, err
 		buildEnv = append(buildEnv, v1.EnvVar{Name: "CI_SCRIPT", Value: generateScript(cmds)})
 		buildEnv = append(buildEnv, v1.EnvVar{Name: "GOPATH", Value: shareddir + "/go"})
 		buildEnv = append(buildEnv, v1.EnvVar{Name: "GIT_REF", Value: build.Commit})
+
 		buildEnv = append(buildEnv, v1.EnvVar{Name: "DOCKER_HOST", Value: fmt.Sprintf("unix:///%v/docker.sock", shareddir)})
 
 		for key, value := range cont.Environment {
