@@ -106,3 +106,83 @@ func TestCreateDockerContainer(t *testing.T) {
 	assert.Equal(t, "/etc/docker/certs.d/some.host.com", c.VolumeMounts[1].MountPath)
 	assert.True(t, *c.SecurityContext.Privileged)
 }
+
+func TestBranchMatch(t *testing.T) {
+	c := yaml.Config{Pipeline: yaml.Containers{Containers: []*yaml.Container{
+		&yaml.Container{
+			Name: "MyStep",
+			Constraints: yaml.Constraints{
+				Branch: yaml.Constraint{
+					Include: []string{"master"},
+				},
+			},
+		},
+	}}}
+	m := c.Pipeline.Containers[0].Constraints.Branch.Match("master")
+	assert.True(t, m)
+	assert.False(t, c.Pipeline.Containers[0].Constraints.Branch.Match("master1"))
+}
+
+func TestBranchMatchExclude(t *testing.T) {
+	c := yaml.Config{Pipeline: yaml.Containers{Containers: []*yaml.Container{
+		&yaml.Container{
+			Name: "MyStep",
+			Constraints: yaml.Constraints{
+				Branch: yaml.Constraint{
+					Exclude: []string{"master"},
+				},
+			},
+		},
+	}}}
+	m := c.Pipeline.Containers[0].Constraints.Branch.Match("master")
+	assert.False(t, m)
+	assert.True(t, c.Pipeline.Containers[0].Constraints.Branch.Match("master1"))
+}
+
+func TestBuildPipeline(t *testing.T) {
+	c := yaml.Config{Pipeline: yaml.Containers{Containers: []*yaml.Container{
+		&yaml.Container{
+			Name: "MyStep",
+			Constraints: yaml.Constraints{
+				Branch: yaml.Constraint{
+					Include: []string{"master"},
+				},
+			},
+		}, &yaml.Container{
+			Name: "My Production Step",
+			Constraints: yaml.Constraints{
+				Branch: yaml.Constraint{
+					Include: []string{"production"},
+				},
+			},
+		}, &yaml.Container{
+			Name: "My Excluded Production Step",
+			Constraints: yaml.Constraints{
+				Branch: yaml.Constraint{
+					Exclude: []string{"myproduction"},
+				},
+			},
+		},
+	}}}
+	build := model.Build{Ref: "refs/heads/master"}
+	containers, err := createBuildSteps(&build, &c)
+	assert.NoError(t, err)
+	assert.NotNil(t, containers)
+	assert.Equal(t, 2, len(containers))
+	assert.Equal(t, "MyStep", containers[0].Name)
+	assert.Equal(t, "My Excluded Production Step", containers[1].Name)
+}
+
+func TestEmptyBuildPipeline(t *testing.T) {
+	c := yaml.Config{Pipeline: yaml.Containers{Containers: []*yaml.Container{
+		&yaml.Container{
+			Name: "MyStep",
+		},
+	}}}
+	build := model.Build{Ref: "refs/heads/master"}
+	containers, err := createBuildSteps(&build, &c)
+	assert.NoError(t, err)
+	assert.NotNil(t, containers)
+	assert.Equal(t, 1, len(containers))
+	assert.Equal(t, "MyStep", containers[0].Name)
+}
