@@ -288,7 +288,7 @@ func waitForContainerCmd(name string) string {
 func getConfigfile(build *model.Build, token string) (*yaml.Config, error) {
 	yamldata, err := github.GetConfigFile(build.Org, build.Name, build.Commit, token)
 	if err != nil {
-		log.Fatal(err)
+		return nil, errors.Wrap(err, "unable to fetch config file from github")
 	}
 
 	cfg, err := yaml.ParseBytes(yamldata)

@@ -10,7 +10,6 @@ import (
 
 	"github.com/sorenmat/pipeline/pipeline/frontend/yaml"
 	"github.com/stretchr/testify/assert"
-
 	"gitlab.com/sorenmat/seneferu/model"
 )
 

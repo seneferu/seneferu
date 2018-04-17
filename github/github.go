@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 
 	"bytes"
@@ -86,13 +87,13 @@ func parseGithubTree(j []byte) (string, error) {
 func fetchConfigFromGithub(org, repo, commit, token string) ([]byte, error) {
 	client := getHTTPSClient()
 	url := fmt.Sprintf("https://api.github.com/repos/%v/%v/git/trees/%v", org, repo, commit)
-	fmt.Println("About to fetch: ", url)
+	log.Println("About to fetch: ", url)
 
 	req, err := githubRequest("GET", url, token)
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to fetch file from github")
+		return nil, errors.Wrap(err, fmt.Sprintf("unable to fetch file from github %v", req.URL))
 	}
 
 	j, err := ioutil.ReadAll(resp.Body)

@@ -73,12 +73,26 @@ func HandlePush(service storage.Service, kubectl *kubernetes.Clientset, token st
 	}
 }
 
+func HandlePing() webhooks.ProcessPayloadFunc {
+	return func(payload interface{}, header webhooks.Header) {
+		pl := payload.(github.PingPayload)
+		log.Println("Got Ping Request", pl)
+	}
+}
+
+func HandleStatus() webhooks.ProcessPayloadFunc {
+	return func(payload interface{}, header webhooks.Header) {
+		log.Println("Got Status Request")
+	}
+}
 func StartWebServer(db storage.Service, kubectl *kubernetes.Clientset, secret string, targetURL string, token string, dockerRegHost string) {
 
 	// Github hook
 	hook := github.New(&github.Config{Secret: secret})
 	hook.RegisterEvents(HandleRelease, github.ReleaseEvent)
+	hook.RegisterEvents(HandleStatus(), github.StatusEvent)
 	hook.RegisterEvents(HandlePullRequest, github.PullRequestEvent)
+	hook.RegisterEvents(HandlePing(), github.PingEvent)
 	hook.RegisterEvents(HandlePush(db, kubectl, token, targetURL, dockerRegHost), github.PushEvent)
 
 	e := echo.New()
