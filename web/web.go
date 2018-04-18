@@ -106,6 +106,7 @@ func StartWebServer(db storage.Service, kubectl *kubernetes.Clientset, secret st
 	e.GET("/repo/:org/:id", handleFetchRepoData(db))
 	e.GET("/repo/:org/:id/builds", handleFetchBuilds(db))
 	e.GET("/repo/:org/:id/build/:buildid", handleFetchBuild(db))
+	e.GET("/repo/:org/:id/build/:buildid/step/:step", handleFetchStep(db))
 
 	// handle github web hook
 	e.Any("/webhook", func(c echo.Context) (err error) {
@@ -249,6 +250,28 @@ func handleFetchBuild(db storage.Service) echo.HandlerFunc {
 		}
 
 		b, err := db.LoadSteps(org, id, buildid)
+		if err != nil {
+			return err
+		}
+		return c.JSON(200, b)
+	}
+}
+
+func handleFetchStep(db storage.Service) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		org := c.Param("org")
+		id := c.Param("id")
+		buildidStr := c.Param("buildid")
+		step := c.Param("step")
+
+		log.Printf("Id: %v\tOrg: %v\tBuildId: %v\tStep: %v\n", id, org, buildidStr, step)
+
+		buildid, err := strconv.Atoi(buildidStr)
+		if err != nil {
+			return err
+		}
+
+		b, err := db.LoadStep(org, id, buildid, step)
 		if err != nil {
 			return err
 		}
