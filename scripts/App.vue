@@ -88,7 +88,8 @@ export default {
             var self = this;
             this.$api.builds(wrapWrap(function(builds){
                 builds.forEach((b) => b.selected = false);
-                self.builds = builds
+                builds.sort((a,b) => b.number-a.number);
+                self.builds = builds;
             }), repo.org, repo.name);
         },
         getBuild : function(build){
@@ -96,6 +97,7 @@ export default {
             this.$api.steps(wrapWrap(function(steps){
                 steps.forEach((s) => s.selected = false);
                 self.selectedBuild.steps = steps;
+                self.selectedStep = 0;
             }), self.selectedRepo.org, self.selectedRepo.name, build.number);
         },
         setupLogStream: function(step){
