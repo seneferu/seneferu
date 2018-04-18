@@ -212,7 +212,7 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 					state = "error"
 				}
 
-				callbackURL := fmt.Sprintf("%v/repo/%v/%v/build/%v", targetURL, build.Org, build.Name, build.Number)
+				callbackURL := fmt.Sprintf("%v/repo/%v/%v/build/%v/step/%v", targetURL, build.Org, build.Name, build.Number, step.Name)
 				err := github.ReportBack(github.GithubStatus{State: state, Context: step.Name, TargetURL: callbackURL}, build.Org, build.Name, build.Commit, token)
 				if err != nil {
 					log.Println("unable to report status back to github")
