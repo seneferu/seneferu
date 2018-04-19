@@ -1,6 +1,7 @@
 module.exports = api = {
     _success: function(cb){return (val) => cb(undefined, val) },
     _fail: function(cb){return (err) => cb(err, undefined) },
+    baseUrl: "", // Mainly good for testing
 
     /* API is a progression into the builds
         First you get a list of repos - then you can get a single repo, but it doesn't contain more info - repos()
@@ -16,7 +17,7 @@ module.exports = api = {
     // List of repos
     repos: function(cb){
         return $.ajax({
-            url: "/repos",
+            url: api.baseUrl + "/repos",
             type: "GET",
             success: api._success(cb),
             error: api._fail(cb)
@@ -25,7 +26,7 @@ module.exports = api = {
     // Single repo object
     repo: function(cb, org, name){
         return $.ajax({
-            url: "/repo/"+org+"/"+name,
+            url: api.baseUrl + "/repo/"+org+"/"+name,
             type: "GET",
             success: api._success(cb),
             error: api._fail(cb)
@@ -34,7 +35,7 @@ module.exports = api = {
     // List of SimpleBuild
     builds: function(cb, org, name){
         return $.ajax({
-            url: "/repo/"+org+"/"+name+"/builds",
+            url: api.baseUrl + "/repo/"+org+"/"+name+"/builds",
             type: "GET",
             success: api._success(cb),
             error: api._fail(cb)
@@ -43,7 +44,7 @@ module.exports = api = {
     // List of BuildStep
     steps: function(cb, org, repo, buildId) {
         return $.ajax({
-            url: "/repo/" + org + "/" + repo + "/build/" + buildId,
+            url: api.baseUrl + "/repo/" + org + "/" + repo + "/build/" + buildId,
             type: "GET",
             success: api._success(cb),
             error: api._fail(cb)

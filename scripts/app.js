@@ -68,11 +68,12 @@ Vue.component('console-output', {
     props: ['buildOutput'],
     template: '<div>' +
     '<h4>Build step output:</h4>' +
-    '<div class="output-log" v-html="consolified(buildOutput)"></div>' +
+    '<div v-for="step in buildOutput.steps" class="output-log" v-html="consolified(step.log)"></div>' +
     '</div>',
     methods: {
         consolified: function(input){
             var ansi_up = new AnsiUp;
+
             var html = ansi_up.ansi_to_html(input).replace(/(?:\r\n|\r|\n)/g, '<br/>');
             return html;
         }
