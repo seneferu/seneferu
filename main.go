@@ -37,6 +37,9 @@ func main() {
 	}
 
 	service, err := sql.New()
+	if err != nil {
+		log.Fatal(errors.Wrap(err, "unable to create database connection"))
+	}
 
 	log.Println("Setting up Kubernets access")
 	kubectl, err := kubernetes.NewForConfig(config)
