@@ -32,10 +32,49 @@ func HandleRelease(payload interface{}, header webhooks.Header) {
 }
 
 // HandlePullRequest handles GitHub pull_request events
-func HandlePullRequest(payload interface{}, header webhooks.Header) {
-	log.Println("Not Handling Pull Request right now")
+func HandlePullRequest(service storage.Service, kubectl *kubernetes.Clientset, token string, targetURL string, dockerRegHost string) webhooks.ProcessPayloadFunc {
+	log.Println("Handling Pull Request right now")
+	return func(payload interface{}, header webhooks.Header) {
+		log.Println("Handling Push Request")
+
+		pl := payload.(github.PullRequestPayload)
+		fmt.Println(pl)
+
+		repo, err := service.LoadByOrgAndName(pl.Repository.Owner.Login, pl.Repository.Name)
+		if err != nil {
+			log.Println("got an error, assuming we couldn't find the repository")
+			repo = &model.Repo{
+				Org:  pl.Repository.Owner.Login,
+				Name: pl.Repository.Name,
+			}
+			log.Printf("Trying to save %v\n", repo)
+			// this is odd move to a save function
+			err = service.SaveRepo(repo)
+			if err != nil {
+				log.Println(err)
+			}
+		}
+
+		build := &model.Build{
+			Org:        pl.PullRequest.Head.Repo.Owner.Login,
+			Name:       pl.PullRequest.Head.Repo.Name,
+			Commit:     pl.PullRequest.Head.Sha,
+			Ref:        pl.PullRequest.Head.Ref,
+			Committers: []string{pl.PullRequest.Head.User.Login},
+			Status:     "Created",
+			Timestamp:  time.Now(),
+			TreesURL:   pl.PullRequest.Head.Repo.TreesURL,
+			StatusURL:  pl.PullRequest.StatusesURL,
+		}
+		fmt.Println("Build: ", build)
+		err = builder.ExecuteBuild(kubectl, service, build, repo, token, targetURL, dockerRegHost)
+		if err != nil {
+			log.Printf("Build failure %v\n", err)
+		}
+	}
 }
 
+// HandlePush receives and handles the push event from github
 func HandlePush(service storage.Service, kubectl *kubernetes.Clientset, token string, targetURL string, dockerRegHost string) webhooks.ProcessPayloadFunc {
 	return func(payload interface{}, header webhooks.Header) {
 		log.Println("Handling Push Request")
@@ -56,6 +95,7 @@ func HandlePush(service storage.Service, kubectl *kubernetes.Clientset, token st
 				log.Println(err)
 			}
 		}
+
 		build := &model.Build{
 			Org:        pl.Repository.Owner.Name,
 			Name:       pl.Repository.Name,
@@ -64,7 +104,10 @@ func HandlePush(service storage.Service, kubectl *kubernetes.Clientset, token st
 			Committers: []string{pl.Pusher.Name},
 			Status:     "Created",
 			Timestamp:  time.Now(),
+			TreesURL:   pl.Repository.TreesURL,
+			StatusURL:  pl.Repository.StatusesURL,
 		}
+
 		err = builder.ExecuteBuild(kubectl, service, build, repo, token, targetURL, dockerRegHost)
 		if err != nil {
 			log.Printf("Build failure %v\n", err)
@@ -91,7 +134,7 @@ func StartWebServer(db storage.Service, kubectl *kubernetes.Clientset, secret st
 	hook := github.New(&github.Config{Secret: secret})
 	hook.RegisterEvents(HandleRelease, github.ReleaseEvent)
 	hook.RegisterEvents(HandleStatus(), github.StatusEvent)
-	hook.RegisterEvents(HandlePullRequest, github.PullRequestEvent)
+	hook.RegisterEvents(HandlePullRequest(db, kubectl, token, targetURL, dockerRegHost), github.PullRequestEvent)
 	hook.RegisterEvents(HandlePing(), github.PingEvent)
 	hook.RegisterEvents(HandlePush(db, kubectl, token, targetURL, dockerRegHost), github.PushEvent)
 

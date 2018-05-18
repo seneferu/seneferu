@@ -137,7 +137,7 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 	pod.Spec.Containers = append(pod.Spec.Containers, buildSteps...)
 
 	for _, v := range buildSteps {
-		err := github.ReportBack(github.GithubStatus{State: "pending", Context: v.Name}, build.Org, build.Name, build.Commit, token)
+		err := github.ReportBack(github.GithubStatus{State: "pending", Context: v.Name}, build.StatusURL, build.Commit, token)
 		if err != nil {
 			log.Println("unable to report status back to github")
 		}
@@ -213,7 +213,7 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 				}
 
 				callbackURL := fmt.Sprintf("%v/repo/%v/%v/build/%v/step/%v", targetURL, build.Org, build.Name, build.Number, step.Name)
-				err := github.ReportBack(github.GithubStatus{State: state, Context: step.Name, TargetURL: callbackURL}, build.Org, build.Name, build.Commit, token)
+				err := github.ReportBack(github.GithubStatus{State: state, Context: step.Name, TargetURL: callbackURL}, build.StatusURL, build.Commit, token)
 				if err != nil {
 					log.Println("unable to report status back to github")
 				}
@@ -286,7 +286,7 @@ func waitForContainerCmd(name string) string {
 }
 
 func getConfigfile(build *model.Build, token string) (*yaml.Config, error) {
-	yamldata, err := github.GetConfigFile(build.Org, build.Name, build.Commit, token)
+	yamldata, err := github.GetConfigFile(build.TreesURL, build.Commit, token)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch config file from github")
 	}
@@ -424,8 +424,16 @@ func createGitContainer(build *model.Build, workspace string) v1.Container {
 	sshTrustCmd := "ssh-keyscan -t rsa github.com > ~/.ssh/known_hosts"
 	cloneCmd := fmt.Sprintf("git clone %v %v", url, workspace)
 	curWDCmd := fmt.Sprintf("cd %v", workspace)
+
 	// TODO take the last element of the refs/head/init this is most likely not a good idea
-	checkoutCmd := fmt.Sprintf("git checkout %v", strings.Split(build.Ref, "/")[2])
+	branch := ""
+	if strings.Contains(build.Ref, "/") {
+		branch = strings.Split(build.Ref, "/")[2]
+	} else {
+		// on a pullrequestevent we only get the branchname
+		branch = build.Ref
+	}
+	checkoutCmd := fmt.Sprintf("git checkout %v", branch)
 	log.Println(checkoutCmd)
 
 	exportSSH := "SSH_AUTH_SOCK=/share/socket; export SSH_AUTH_SOCK"

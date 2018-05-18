@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
 
 	"bytes"
 	"encoding/json"
@@ -18,8 +19,8 @@ import (
 const configfilename = ".ci.yaml"
 
 // GetConfigFile tries to fetch the .ci.yaml file from the github repository
-func GetConfigFile(org, repo, commit, token string) ([]byte, error) {
-	j, err := fetchConfigFromGithub(org, repo, commit, token)
+func GetConfigFile(treeURL, commit, token string) ([]byte, error) {
+	j, err := fetchConfigFromGithub(treeURL, commit, token)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to binary data")
 	}
@@ -84,9 +85,10 @@ func parseGithubTree(j []byte) (string, error) {
 	return "", fmt.Errorf("unable to find URL to .ci.yaml file in repository")
 }
 
-func fetchConfigFromGithub(org, repo, commit, token string) ([]byte, error) {
+func fetchConfigFromGithub(treeURL, commit, token string) ([]byte, error) {
 	client := getHTTPSClient()
-	url := fmt.Sprintf("https://api.github.com/repos/%v/%v/git/trees/%v", org, repo, commit)
+
+	url := strings.Replace(treeURL, "{/sha}", "/"+commit, -1)
 	log.Println("About to fetch: ", url)
 
 	req, err := githubRequest("GET", url, token)
@@ -122,14 +124,15 @@ func getHTTPSClient() *http.Client {
 }
 
 // ReportBack sends the build status back to Github
-func ReportBack(state GithubStatus, owner, repo, sha, token string) error {
+func ReportBack(state GithubStatus, statusURL, sha, token string) error {
 	body, err := json.Marshal(&state)
 	if err != nil {
 		return errors.Wrap(err, "unable to marshal status struct")
 	}
 
 	client := getHTTPSClient()
-	url := fmt.Sprintf("https://api.github.com/repos/%v/%v/statuses/%v", owner, repo, sha)
+	url := strings.Replace(statusURL, "{sha}", sha, -1)
+	log.Println("Reporting status back to ", url)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
 		return errors.Wrap(err, "unable to create request to github")

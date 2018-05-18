@@ -20,7 +20,9 @@ type Build struct {
 	Coverage   string     `json:"coverage"`
 	Duration   string     `json:"duration"`
 
-	Ref string
+	Ref       string
+	TreesURL  string
+	StatusURL string
 }
 
 // StepInfo contains information about each build step
