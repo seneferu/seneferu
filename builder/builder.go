@@ -8,10 +8,11 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"strings"
+	"sync"
 	"time"
 
-	"strings"
-
+	libcompose "github.com/docker/libcompose/yaml"
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 	"github.com/sorenmat/pipeline/pipeline/frontend/yaml"
@@ -19,10 +20,88 @@ import (
 	"gitlab.com/sorenmat/seneferu/github"
 	"gitlab.com/sorenmat/seneferu/model"
 	"gitlab.com/sorenmat/seneferu/storage"
+	yamllib "gopkg.in/yaml.v2"
 	"k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
+
+type Config struct {
+	Platform  string
+	Branches  yaml.Constraint
+	Workspace yaml.Workspace
+	Clone     Containers
+	Pipeline  Containers
+	Services  Containers
+	Networks  yaml.Networks
+	Volumes   yaml.Volumes
+	Labels    libcompose.SliceorMap
+}
+
+// Containers denotes an ordered collection of containers.
+type Containers struct {
+	Containers []*Container
+}
+
+// Container defines a container.
+type Container struct {
+	AuthConfig    yaml.AuthConfig           `yaml:"auth_config,omitempty"`
+	CapAdd        []string                  `yaml:"cap_add,omitempty"`
+	CapDrop       []string                  `yaml:"cap_drop,omitempty"`
+	Command       libcompose.Command        `yaml:"command,omitempty"`
+	Commands      libcompose.Stringorslice  `yaml:"commands,omitempty"`
+	CPUQuota      libcompose.StringorInt    `yaml:"cpu_quota,omitempty"`
+	CPUSet        string                    `yaml:"cpuset,omitempty"`
+	CPUShares     libcompose.StringorInt    `yaml:"cpu_shares,omitempty"`
+	Detached      bool                      `yaml:"detach,omitempty"`
+	Devices       []string                  `yaml:"devices,omitempty"`
+	DNS           libcompose.Stringorslice  `yaml:"dns,omitempty"`
+	DNSSearch     libcompose.Stringorslice  `yaml:"dns_search,omitempty"`
+	Entrypoint    libcompose.Command        `yaml:"entrypoint,omitempty"`
+	Environment   libcompose.SliceorMap     `yaml:"environment,omitempty"`
+	ExtraHosts    []string                  `yaml:"extra_hosts,omitempty"`
+	Group         string                    `yaml:"group,omitempty"`
+	Image         string                    `yaml:"image,omitempty"`
+	Isolation     string                    `yaml:"isolation,omitempty"`
+	Labels        libcompose.SliceorMap     `yaml:"labels,omitempty"`
+	MemLimit      libcompose.MemStringorInt `yaml:"mem_limit,omitempty"`
+	MemSwapLimit  libcompose.MemStringorInt `yaml:"memswap_limit,omitempty"`
+	MemSwappiness libcompose.MemStringorInt `yaml:"mem_swappiness,omitempty"`
+	Name          string                    `yaml:"name,omitempty"`
+	NetworkMode   string                    `yaml:"network_mode,omitempty"`
+	Networks      libcompose.Networks       `yaml:"networks,omitempty"`
+	Privileged    bool                      `yaml:"privileged,omitempty"`
+	Pull          bool                      `yaml:"pull,omitempty"`
+	ShmSize       libcompose.MemStringorInt `yaml:"shm_size,omitempty"`
+	Ulimits       libcompose.Ulimits        `yaml:"ulimits,omitempty"`
+	Volumes       libcompose.Volumes        `yaml:"volumes,omitempty"`
+	Constraints   yaml.Constraints          `yaml:"when,omitempty"`
+	Vargs         map[string]interface{}    `yaml:",inline"`
+	Coverage      string                    `yaml:"coverage,omitempty"`
+	Args          []string                  `yaml:"args,omitempty"`
+}
+
+// UnmarshalYAML implements the Unmarshaller interface.
+func (c *Containers) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	slice := yamllib.MapSlice{}
+	if err := unmarshal(&slice); err != nil {
+		return err
+	}
+
+	for _, s := range slice {
+		container := Container{}
+		out, _ := yamllib.Marshal(s.Value)
+
+		if err := yamllib.Unmarshal(out, &container); err != nil {
+			return err
+		}
+		if container.Name == "" {
+			container.Name = fmt.Sprintf("%v", s.Key)
+		}
+		c.Containers = append(c.Containers, &container)
+	}
+	return nil
+}
 
 const shareddir = "/share"
 
@@ -117,6 +196,7 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 
 	log.Println("Scheduling build: ", buildUUID)
 	pod.ObjectMeta.Name = buildUUID
+	pod.Spec.RestartPolicy = "Never"
 
 	pod.Spec.Volumes = volumemounts()
 	// add container to the pod
@@ -151,7 +231,7 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 	prepareSteps = append(prepareSteps, createSSHAgentContainer())
 	prepareSteps = append(prepareSteps, createGitContainer(build, cfg.Workspace.Path))
 
-	x, err := createBuildSteps(build, cfg)
+	x, err := createBuildSteps(build, cfg, token)
 	buildSteps = append(buildSteps, x...)
 	if err != nil {
 		return errors.Wrap(err, "unable to create build steps")
@@ -236,38 +316,25 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 
 	// wait for all the build steps to finish
 	log.Println("Waiting for build steps...")
-	for _, b := range buildSteps {
-		waitForContainerTermination(kubectl, b, buildUUID, ns.Name)
-	}
-
+	/*	for _, b := range buildSteps {
+			waitForContainerTermination(kubectl, b, buildUUID, ns.Name)
+		}
+	*/
+	var wg sync.WaitGroup
 	build.Success = true
 	for _, b := range buildSteps {
 		for _, step := range build.Steps {
 			if step.Name == b.Name {
-				exitCode, _ := waitForContainerTermination(kubectl, b, buildUUID, ns.Name)
-				if exitCode > 0 {
-					build.Status = "Failed"
-					build.Success = false
-					step.Status = "Failed"
-				}
-				step.ExitCode = exitCode
-				var state string
-				if exitCode == 0 {
-					state = "success"
-				} else {
-					state = "error"
-				}
+				wg.Add(1)
+				go func(kubectl *kubernetes.Clientset, b v1.Container, buildUUID string, namespace string, step *model.Step, build *model.Build, token string, targetURL string) {
+					defer wg.Done()
+					waitForBuildStep(kubectl, b, buildUUID, ns.Name, step, build, token, targetURL)
 
-				callbackURL := fmt.Sprintf("%v/repo/%v/%v/build/%v/step/%v", targetURL, build.Org, build.Name, build.Number, step.Name)
-				err := github.ReportBack(github.GithubStatus{State: state, Context: step.Name, TargetURL: callbackURL}, build.StatusURL, build.Commit, token)
-				if err != nil {
-					log.Println("unable to report status back to github")
-				}
-
+				}(kubectl, b, buildUUID, ns.Name, step, build, token, targetURL)
 			}
 		}
 	}
-
+	wg.Wait()
 	log.Println("All build steps done...")
 
 	// TODO fix this
@@ -302,6 +369,25 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 	return nil
 }
 
+func waitForBuildStep(kubectl *kubernetes.Clientset, b v1.Container, buildUUID string, namespace string, step *model.Step, build *model.Build, token string, targetURL string) {
+	exitCode, _ := waitForContainerTermination(kubectl, b, buildUUID, namespace)
+	step.ExitCode = exitCode
+	var state string
+	if exitCode == 0 {
+		state = "success"
+	} else {
+		build.Status = "Failed"
+		build.Success = false
+		step.Status = "Failed"
+		state = "error"
+	}
+	callbackURL := fmt.Sprintf("%v/#/repo/%v/%v/build/%v/step/%v", targetURL, build.Org, build.Name, build.Number, step.Name)
+	err := github.ReportBack(github.GithubStatus{State: state, Context: step.Name, TargetURL: callbackURL}, build.StatusURL, build.Commit, token)
+	if err != nil {
+		log.Println("unable to report status back to github")
+	}
+
+}
 func cleanupNamespace(kubectl *kubernetes.Clientset, namespace string) {
 	log.Printf("clean up of namespace %v started", namespace)
 	err := kubectl.CoreV1().Namespaces().Delete(namespace, &meta_v1.DeleteOptions{})
@@ -315,7 +401,7 @@ func cleanupNamespace(kubectl *kubernetes.Clientset, namespace string) {
 func generateScript(commands []string) string {
 	var buf bytes.Buffer
 	for _, command := range commands {
-		buf.WriteString(fmt.Sprintf("echo '%s'\n%s\n", command, command))
+		buf.WriteString(fmt.Sprintf("%s\n", command))
 	}
 	return base64.StdEncoding.EncodeToString([]byte(buf.String()))
 }
@@ -328,16 +414,32 @@ func waitForContainerCmd(name string) string {
 	return command
 }
 
-func getConfigfile(build *model.Build, token string) (*yaml.Config, error) {
+// ParseBytes parses the configuration from bytes b.
+func ParseBytes(b []byte) (*Config, error) {
+	out := &Config{}
+	err := yamllib.Unmarshal(b, out)
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+func getConfigfile(build *model.Build, token string) (*Config, error) {
 	yamldata, err := github.GetConfigFile(build.TreesURL, build.Commit, token)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch config file from github")
 	}
+	return yamlToConfig(yamldata)
+}
 
-	cfg, err := yaml.ParseBytes(yamldata)
+func yamlToConfig(yamldata []byte) (*Config, error) {
+	log.Println("YAML data:", string(yamldata))
+	cfg, err := ParseBytes(yamldata)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to parse .ci.yaml file")
 	}
+	log.Println("Contructed cfg: ", cfg)
 	return cfg, nil
 }
 
@@ -363,18 +465,19 @@ func getCoverageFromLogs(build *model.Build, buildNumber int, testCoverage strin
 	return ""
 }
 
-func createBuildSteps(build *model.Build, cfg *yaml.Config) ([]v1.Container, error) {
-	log.Println("constructing build")
+func createBuildSteps(build *model.Build, cfg *Config, token string) ([]v1.Container, error) {
+	log.Println("Creating build steps from YAML file")
 	count := 0
-
 	var containers []v1.Container
 	for _, cont := range cfg.Pipeline.Containers {
 		// strip "refs/heads/"
+
 		branch := strings.Replace(build.Ref, "refs/heads/", "", -1)
 		if !cont.Constraints.Branch.Match(branch) {
 			log.Printf("Branch %v didn't meet condition of %v\n", build.Ref, cont.Constraints.Branch)
 			continue
 		}
+		log.Printf("Branch %v meet condition of %v\n", build.Ref, cont.Constraints.Branch)
 		var cmds []string
 		// first command should be the wait for containers+
 		cmds = append(cmds, waitForContainerCmd("git"))
@@ -401,7 +504,7 @@ func createBuildSteps(build *model.Build, cfg *yaml.Config) ([]v1.Container, err
 		buildEnv = append(buildEnv, v1.EnvVar{Name: "CI_SCRIPT", Value: generateScript(cmds)})
 		buildEnv = append(buildEnv, v1.EnvVar{Name: "GOPATH", Value: shareddir + "/go"})
 		buildEnv = append(buildEnv, v1.EnvVar{Name: "GIT_REF", Value: build.Commit})
-
+		buildEnv = append(buildEnv, v1.EnvVar{Name: "GITHUB_TOKEN", Value: token})
 		buildEnv = append(buildEnv, v1.EnvVar{Name: "DOCKER_HOST", Value: fmt.Sprintf("unix:///%v/docker.sock", shareddir)})
 
 		for key, value := range cont.Environment {
@@ -444,7 +547,7 @@ func createBuildSteps(build *model.Build, cfg *yaml.Config) ([]v1.Container, err
 	return containers, nil
 }
 
-func createServiceSteps(cfg *yaml.Config) ([]v1.Container, error) {
+func createServiceSteps(cfg *Config) ([]v1.Container, error) {
 
 	var containers []v1.Container
 	for _, serv := range cfg.Services.Containers {
@@ -591,12 +694,6 @@ func waitForContainerTermination(kubectl *kubernetes.Clientset, b v1.Container, 
 		if err != nil {
 			return -1, errors.Wrap(err, "unable to get pod, while waiting for it")
 		}
-		reason, err := printPod(pod)
-		if err != nil {
-			log.Println("print pod error", err)
-		}
-		log.Println("REASON: ", reason)
-
 		for _, v := range pod.Status.ContainerStatuses {
 			if v.Name == b.Name {
 				if v.State.Terminated != nil && v.State.Terminated.Reason != "" {
@@ -656,10 +753,10 @@ func waitForContainer(kubectl *kubernetes.Clientset, buildname string, namespace
 			return fmt.Errorf(reason)
 		}
 		log.Println("unknown reason state", reason)
-		if pod.Status.Phase == "Running" || pod.Status.Phase == "Succeeded" || pod.Status.Phase == "Failed" {
+		if pod.Status.Phase == v1.PodRunning || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
 			return nil
 		}
-		log.Println("Waitting for " + buildname + " " + pod.Status.Reason)
+		log.Printf("Waitting for %v %v %v\n", buildname, pod.Status.Reason, pod.Status.Phase)
 		time.Sleep(2 * time.Second)
 	}
 }

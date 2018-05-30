@@ -10,6 +10,7 @@ type Service interface {
 	All() ([]*model.Repo, error)
 	LoadByOrgAndName(string, string) (*model.Repo, error)
 	LoadBuilds(string, string) ([]*model.Build, error)
+	LoadAllBuilds(int) ([]*model.Build, error)
 	LoadBuild(string, string, int) (*model.Build, error)
 	LoadStep(string, string, int, string) (*model.Step, error)
 	LoadSteps(org string, name string, build int) ([]*model.Step, error)

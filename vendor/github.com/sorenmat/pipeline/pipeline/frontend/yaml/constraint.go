@@ -4,14 +4,12 @@ import (
 	"path/filepath"
 
 	"github.com/cncd/pipeline/pipeline/frontend"
-	"github.com/cncd/pipeline/pipeline/frontend/yaml/types"
 	libcompose "github.com/docker/libcompose/yaml"
 )
 
 type (
 	// Constraints defines a set of runtime constraints.
 	Constraints struct {
-		Ref         Constraint
 		Repo        Constraint
 		Instance    Constraint
 		Platform    Constraint
@@ -20,7 +18,6 @@ type (
 		Branch      Constraint
 		Status      Constraint
 		Matrix      ConstraintMap
-		Local       types.BoolTrue
 	}
 
 	// Constraint defines a runtime constraint.
@@ -44,7 +41,6 @@ func (c *Constraints) Match(metadata frontend.Metadata) bool {
 		c.Event.Match(metadata.Curr.Event) &&
 		c.Branch.Match(metadata.Curr.Commit.Branch) &&
 		c.Repo.Match(metadata.Repo.Name) &&
-		c.Ref.Match(metadata.Curr.Commit.Ref) &&
 		c.Matrix.Match(metadata.Job.Matrix)
 }
 

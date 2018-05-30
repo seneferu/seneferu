@@ -140,7 +140,7 @@ func (r *SQLDB) All() ([]*model.Repo, error) {
 func (r *SQLDB) LoadByOrgAndName(org, name string) (*model.Repo, error) {
 	var repo model.Repo
 
-	rows, err := r.db.Query("SELECT org,url,name,org FROM repositories WHERE ORG=$1 AND NAME=$2", org, name)
+	rows, err := r.db.Query("SELECT org,url,name FROM repositories WHERE ORG=$1 AND NAME=$2", org, name)
 	if err != nil {
 		return &repo, err
 	}
@@ -148,7 +148,7 @@ func (r *SQLDB) LoadByOrgAndName(org, name string) (*model.Repo, error) {
 
 	found := false
 	for rows.Next() {
-		err = rows.Scan(&repo.Org, &repo.URL, &repo.Name, &repo.Org)
+		err = rows.Scan(&repo.Org, &repo.URL, &repo.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -187,7 +187,7 @@ func (r *SQLDB) LoadBuild(org, name string, build int) (*model.Build, error) {
 func (r *SQLDB) LoadBuilds(org, name string) ([]*model.Build, error) {
 	bb := make([]*model.Build, 0)
 
-	rows, err := r.db.Query("SELECT org,name,number,comitters,created,status,commit,coverage,duration FROM builds WHERE ORG=$1 AND NAME=$2", org, name)
+	rows, err := r.db.Query("SELECT org,name,number,comitters,created,success,status,commit,coverage,duration FROM builds WHERE ORG=$1 AND NAME=$2 ORDER BY created DESC", org, name)
 	if err != nil {
 		return bb, err
 	}
@@ -196,7 +196,33 @@ func (r *SQLDB) LoadBuilds(org, name string) ([]*model.Build, error) {
 	for rows.Next() {
 		b := &model.Build{}
 		var c string
-		err = rows.Scan(&b.Org, &b.Name, &b.Number, &c, &b.Timestamp, &b.Status, &b.Commit, &b.Coverage, &b.Duration)
+		err = rows.Scan(&b.Org, &b.Name, &b.Number, &c, &b.Timestamp, &b.Success, &b.Status, &b.Commit, &b.Coverage, &b.Duration)
+		b.Committers = strings.Split(c, ",")
+		bb = append(bb, b)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return bb, nil
+}
+
+// LoadAllBuilds loads a all builds for a given repository
+func (r *SQLDB) LoadAllBuilds(max int) ([]*model.Build, error) {
+	bb := make([]*model.Build, 0)
+	maxStr := "ALL"
+	if max > 0 {
+		maxStr = fmt.Sprintf("%v", max)
+	}
+	rows, err := r.db.Query("SELECT org,name,number,comitters,created,success,status,commit,coverage,duration FROM builds ORDER BY created DESC LIMIT $1", maxStr)
+	if err != nil {
+		return bb, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		b := &model.Build{}
+		var c string
+		err = rows.Scan(&b.Org, &b.Name, &b.Number, &c, &b.Timestamp, &b.Success, &b.Status, &b.Commit, &b.Coverage, &b.Duration)
 		b.Committers = strings.Split(c, ",")
 		bb = append(bb, b)
 		if err != nil {
@@ -345,10 +371,10 @@ func (r *SQLDB) SaveStep(step *model.Step) error {
 // GetNextBuildNumber returns the next available build number, this is currently globally unique
 func (r *SQLDB) GetNextBuildNumber(org, repo_name string) (int, error) {
 	if org == "" {
-		return -1,fmt.Errorf("org is required for the build struct")
+		return -1, fmt.Errorf("org is required for the build struct")
 	}
 	if repo_name == "" {
-		return -1,fmt.Errorf("name is required for the build struct")
+		return -1, fmt.Errorf("name is required for the build struct")
 	}
 
 	stmt, err := r.db.Prepare("INSERT INTO builds(org,name,number) " +
@@ -356,15 +382,14 @@ func (r *SQLDB) GetNextBuildNumber(org, repo_name string) (int, error) {
 	defer stmt.Close()
 	if err != nil {
 		// To log or not to log, thats the question?
-		return -1, err;
+		return -1, err
 	}
 
-	build_num := 0;
-	err = stmt.QueryRow(org, repo_name).Scan(&build_num);
+	build_num := 0
+	err = stmt.QueryRow(org, repo_name).Scan(&build_num)
 
-	return build_num, err;
+	return build_num, err
 }
-
 
 // Close the connection to the database
 func (r SQLDB) Close() {

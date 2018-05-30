@@ -48,7 +48,6 @@ type (
 		Target   string `json:"target,omitempty"`
 		Trusted  bool   `json:"trusted,omitempty"`
 		Commit   Commit `json:"commit,omitempty"`
-		Parent   int    `json:"parent,omitempty"`
 	}
 
 	// Commit defines runtime metadata for a commit.
@@ -102,7 +101,6 @@ func (m *Metadata) Environ() map[string]string {
 		"CI_REMOTE_URL":                m.Repo.Remote,
 		"CI_REPO_PRIVATE":              strconv.FormatBool(m.Repo.Private),
 		"CI_BUILD_NUMBER":              strconv.Itoa(m.Curr.Number),
-		"CI_PARENT_BUILD_NUMBER":       strconv.Itoa(m.Curr.Parent),
 		"CI_BUILD_CREATED":             strconv.FormatInt(m.Curr.Created, 10),
 		"CI_BUILD_STARTED":             strconv.FormatInt(m.Curr.Started, 10),
 		"CI_BUILD_FINISHED":            strconv.FormatInt(m.Curr.Finished, 10),
@@ -154,32 +152,20 @@ func (m *Metadata) Environ() map[string]string {
 }
 
 // EnvironDrone returns metadata as a map of DRONE_ environment variables.
-// TODO: This is here for backward compatibility and will eventually be removed.
+// This is here for backward compatibility and will eventually be removed.
 func (m *Metadata) EnvironDrone() map[string]string {
 	// MISSING PARAMETERS
 	// * DRONE_REPO_TRUSTED
 	// * DRONE_YAML_VERIFIED
 	// * DRONE_YAML_VERIFIED
-	var (
-		owner string
-		name  string
-
-		parts = strings.Split(m.Repo.Name, "/")
-	)
-	if len(parts) == 2 {
-		owner = strings.Split(m.Repo.Name, "/")[0]
-		name = strings.Split(m.Repo.Name, "/")[1]
-	} else {
-		name = m.Repo.Name
-	}
 	params := map[string]string{
 		"CI":                         "drone",
 		"DRONE":                      "true",
 		"DRONE_ARCH":                 "linux/amd64",
 		"DRONE_REPO":                 m.Repo.Name,
 		"DRONE_REPO_SCM":             "git",
-		"DRONE_REPO_OWNER":           owner,
-		"DRONE_REPO_NAME":            name,
+		"DRONE_REPO_OWNER":           strings.Split(m.Repo.Name, "/")[0],
+		"DRONE_REPO_NAME":            strings.Split(m.Repo.Name, "/")[0],
 		"DRONE_REPO_LINK":            m.Repo.Link,
 		"DRONE_REPO_BRANCH":          m.Curr.Commit.Branch,
 		"DRONE_REPO_PRIVATE":         fmt.Sprintf("%v", m.Repo.Private),
@@ -195,7 +181,6 @@ func (m *Metadata) EnvironDrone() map[string]string {
 		"DRONE_COMMIT_AUTHOR_EMAIL":  m.Curr.Commit.Author.Email,
 		"DRONE_COMMIT_AUTHOR_AVATAR": m.Curr.Commit.Author.Avatar,
 		"DRONE_BUILD_NUMBER":         fmt.Sprintf("%d", m.Curr.Number),
-		"DRONE_PARENT_BUILD_NUMBER":  fmt.Sprintf("%d", m.Curr.Parent),
 		"DRONE_BUILD_EVENT":          m.Curr.Event,
 		"DRONE_BUILD_LINK":           fmt.Sprintf("%s/%s/%d", m.Sys.Link, m.Repo.Name, m.Curr.Number),
 		"DRONE_BUILD_CREATED":        fmt.Sprintf("%d", m.Curr.Created),
@@ -211,7 +196,7 @@ func (m *Metadata) EnvironDrone() map[string]string {
 		"DRONE_PREV_BUILD_NUMBER":    fmt.Sprintf("%v", m.Prev.Number),
 		"DRONE_PREV_COMMIT_SHA":      m.Prev.Commit.Sha,
 	}
-	if m.Curr.Event == EventTag || strings.HasPrefix(m.Curr.Commit.Ref, "refs/tags/") {
+	if m.Curr.Event == EventTag {
 		params["DRONE_TAG"] = strings.TrimPrefix(m.Curr.Commit.Ref, "refs/tags/")
 	}
 	if m.Curr.Event == EventPull {

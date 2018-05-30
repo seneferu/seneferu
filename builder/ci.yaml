@@ -1,0 +1,28 @@
+workspace:
+  path: /go/src/github.com/Tradeshift/kaide
+pipeline:
+  build:
+    group: build
+    image: golang:latest
+    commands:
+      - go get -u github.com/UnnoTed/fileb0x
+      - /share/go/bin/fileb0x b0x.yaml
+      - go build      
+  test:
+    group: build
+    image: golang:latest
+    commands:
+      - go get -u github.com/UnnoTed/fileb0x
+      - /share/go/bin/fileb0x b0x.yaml
+      - go test ./...
+  release:
+    group: build
+    image: sorenmat/goreleaser:v0.77.0
+    when:
+      branch:
+        include:
+          - master
+          - refs/tags/*
+    commands:
+      - goreleaser
+      
