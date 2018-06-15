@@ -30,7 +30,7 @@ const SSHKEY = "sshkey"
 
 // CreateSSHKeySecret creates and ssh key in the Kubernetes cluster to be used for
 // cloning repositories
-func CreateSSHKeySecret(kubectl *kubernetes.Clientset, sshkey string) error {
+func CreateSSHKeySecret(kubectl *kubernetes.Clientset, sshkey string, namespace string) error {
 	key, err := base64.StdEncoding.DecodeString(string(sshkey))
 	if err != nil {
 		return errors.Wrap(err, "unable to decode base64 encoded sshkey, is it encoded?")
@@ -39,16 +39,30 @@ func CreateSSHKeySecret(kubectl *kubernetes.Clientset, sshkey string) error {
 		ObjectMeta: meta_v1.ObjectMeta{Name: SSHKEY},
 		Data:       map[string][]byte{"id_rsa": key},
 	}
-	exsistingKey, _ := kubectl.CoreV1().Secrets("default").Get(SSHKEY, meta_v1.GetOptions{})
-	if exsistingKey != nil {
-		log.Println("sshkey exsists, will try to update it")
-		_, err := kubectl.CoreV1().Secrets("default").Update(&cm)
-		return err
-	} else {
-		log.Println("sshkey mssing, will try to create it")
-		_, err := kubectl.CoreV1().Secrets("default").Create(&cm)
-		return err
+	cm.Namespace = namespace
+	_, err = kubectl.CoreV1().Secrets(namespace).Create(&cm)
+	if err != nil {
+		log.Println("was unable to create ssh key in ", namespace)
 	}
+
+	// get docker secret from default NS and copy it to the build namespace
+	sd, err := kubectl.CoreV1().Secrets("default").Get("seneferu-docker", meta_v1.GetOptions{})
+	if err != nil {
+		log.Println("was unable to get seneferu docker key")
+	}
+
+	sd.Namespace = namespace
+	sd.ResourceVersion = ""
+	sd.GenerateName = ""
+	sd.Generation = 0
+	_, err = kubectl.CoreV1().Secrets(namespace).Create(sd)
+	if err != nil {
+		log.Println("was unable to create docker secret in ", namespace)
+	}
+	waitForSecret(kubectl, sd.Name, namespace)
+	waitForSecret(kubectl, SSHKEY, namespace)
+
+	return err
 }
 
 func volumemounts() []v1.Volume {
@@ -79,7 +93,7 @@ func volumemounts() []v1.Volume {
 	}
 }
 
-func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build *model.Build, repo *model.Repo, token string, targetURL string, dockerRegHost string) error {
+func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build *model.Build, repo *model.Repo, token string, targetURL string, dockerRegHost string, sshkey string) error {
 	pod := &v1.Pod{Spec: v1.PodSpec{
 		RestartPolicy: "Never",
 	},
@@ -110,6 +124,20 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 	if err != nil {
 		return errors.Wrap(err, "unable to handle buildconfig file")
 	}
+	ns := &v1.Namespace{}
+	ns.Name = pod.Name
+	ns.Namespace = pod.Name
+	_, err = kubectl.CoreV1().Namespaces().Create(ns)
+	if err != nil {
+		return errors.Wrapf(err, "Error creating namespace %v: %v", ns, err)
+	}
+	waitForNamespace(kubectl, ns.Name)
+
+	err = CreateSSHKeySecret(kubectl, sshkey, ns.Name)
+	if err != nil {
+		log.Fatal("Unable to create or update secret 'sshkey': ", err)
+	}
+
 	if cfg.Workspace.Path == "" {
 		cfg.Workspace.Path = build.Name
 	}
@@ -143,7 +171,8 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 		}
 	}
 
-	_, err = kubectl.CoreV1().Pods("default").Create(pod)
+	pod.Namespace = ns.Name
+	_, err = kubectl.CoreV1().Pods(ns.Name).Create(pod)
 	if err != nil {
 		return errors.Wrapf(err, "Error starting build: %v", err)
 	}
@@ -155,7 +184,7 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 
 	// replace above sleep with a polling of the container ready state
 	// perhaps replace with a listen hook
-	waitForContainer(kubectl, buildUUID)
+	waitForContainer(kubectl, buildUUID, ns.Name)
 	build.Status = "Running"
 	err = service.SaveBuild(build)
 	if err != nil {
@@ -174,7 +203,7 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 			return errors.Wrap(err, fmt.Sprintf("unable to save build step %v", b.Name))
 		}
 
-		go registerLog(service, repo.Org, repo.Name, step, buildUUID, b.Name, build, kubectl)
+		go registerLog(service, repo.Org, repo.Name, step, buildUUID, b.Name, build, kubectl, ns.Name)
 	}
 	for _, b := range services {
 		s := &model.Service{Name: b.Name}
@@ -183,7 +212,7 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("unable to save build %v", build))
 		}
-		go registerLogForService(service, repo.Org, repo.Name, buildUUID, b.Name, build, kubectl)
+		go registerLogForService(service, repo.Org, repo.Name, buildUUID, b.Name, build, kubectl, ns.Name)
 	}
 
 	//perhaps wait for pod to be in Completed or Error state
@@ -191,14 +220,14 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 	// wait for all the build steps to finish
 	log.Println("Waiting for build steps...")
 	for _, b := range buildSteps {
-		waitForContainerTermination(kubectl, b, buildUUID)
+		waitForContainerTermination(kubectl, b, buildUUID, ns.Name)
 	}
 
 	build.Success = true
 	for _, b := range buildSteps {
 		for _, step := range build.Steps {
 			if step.Name == b.Name {
-				exitCode, _ := waitForContainerTermination(kubectl, b, buildUUID)
+				exitCode, _ := waitForContainerTermination(kubectl, b, buildUUID, ns.Name)
 				if exitCode > 0 {
 					build.Status = "Failed"
 					build.Success = false
@@ -255,13 +284,13 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 
 	// clean up
 
-	err = kubectl.CoreV1().Pods("default").Delete(buildUUID, &meta_v1.DeleteOptions{})
+	err = kubectl.CoreV1().Namespaces().Delete(ns.Name, &meta_v1.DeleteOptions{})
 	if err != nil {
-		log.Println("Error while deleing pod: ", err)
-		return errors.Wrap(err, "Error while deleing pod")
+		log.Println("Error while deleing namespace: ", err)
+		return errors.Wrap(err, "Error while deleing namespace")
 	}
 
-	log.Println("Pod deleted!")
+	log.Println("Namespace deleted!")
 	log.Println("*****************************************")
 	log.Println("Declaring build done")
 	log.Println("*****************************************")
@@ -540,9 +569,9 @@ func createDockerContainer(dockerRegHost string) v1.Container {
 	}
 }
 
-func waitForContainerTermination(kubectl *kubernetes.Clientset, b v1.Container, buildUUID string) (int32, error) {
+func waitForContainerTermination(kubectl *kubernetes.Clientset, b v1.Container, buildUUID string, namespace string) (int32, error) {
 	for {
-		pod, err := kubectl.CoreV1().Pods("default").Get(buildUUID, meta_v1.GetOptions{})
+		pod, err := kubectl.CoreV1().Pods(namespace).Get(buildUUID, meta_v1.GetOptions{})
 		if err != nil {
 			return -1, errors.Wrap(err, "unable to get pod, while waiting for it")
 		}
@@ -557,9 +586,9 @@ func waitForContainerTermination(kubectl *kubernetes.Clientset, b v1.Container, 
 	}
 }
 
-func registerLog(service storage.Service, org string, reponame string, step *model.Step, buildUUID string, name string, build *model.Build, kubectl *kubernetes.Clientset) error {
+func registerLog(service storage.Service, org string, reponame string, step *model.Step, buildUUID string, name string, build *model.Build, kubectl *kubernetes.Clientset, namespace string) error {
 	// start watching the logs in a separate go routine
-	err := saveLog(kubectl, buildUUID, name, step)
+	err := saveLog(kubectl, buildUUID, name, step, namespace)
 	if err != nil {
 		log.Println("Error while getting log ", err)
 	}
@@ -571,9 +600,9 @@ func registerLog(service storage.Service, org string, reponame string, step *mod
 	return nil
 }
 
-func registerLogForService(service storage.Service, org string, reponame string, buildUUID string, name string, build *model.Build, kubectl *kubernetes.Clientset) error {
+func registerLogForService(service storage.Service, org string, reponame string, buildUUID string, name string, build *model.Build, kubectl *kubernetes.Clientset, namespace string) error {
 	// get the log without waiting, since its a service and it should be running for ever...
-	err := saveLog(kubectl, buildUUID, name, nil)
+	err := saveLog(kubectl, buildUUID, name, nil, namespace)
 	if err != nil {
 		log.Println("Error while getting log ", err)
 	}
@@ -584,9 +613,9 @@ func registerLogForService(service storage.Service, org string, reponame string,
 	return nil
 }
 
-func waitForContainer(kubectl *kubernetes.Clientset, buildname string) error {
+func waitForContainer(kubectl *kubernetes.Clientset, buildname string, namespace string) error {
 	for {
-		pod, err := kubectl.CoreV1().Pods("default").Get(buildname, meta_v1.GetOptions{})
+		pod, err := kubectl.CoreV1().Pods(namespace).Get(buildname, meta_v1.GetOptions{})
 		if err != nil {
 			return errors.Wrap(err, "unable to get pod, while waiting for it")
 		}
@@ -599,9 +628,9 @@ func waitForContainer(kubectl *kubernetes.Clientset, buildname string) error {
 }
 
 // saveLog get the build of container in a running pod
-func saveLog(kubectl *kubernetes.Clientset, pod string, container string, step *model.Step) error {
+func saveLog(kubectl *kubernetes.Clientset, pod string, container string, step *model.Step, namespace string) error {
 	log.Printf("Trying to get log for %v %v\n", pod, container)
-	req := kubectl.CoreV1().Pods("default").GetLogs(pod, &v1.PodLogOptions{
+	req := kubectl.CoreV1().Pods(namespace).GetLogs(pod, &v1.PodLogOptions{
 		Container: container,
 		Follow:    true,
 		//Timestamps: true,
@@ -629,4 +658,41 @@ func (d DBLogWriter) Write(p []byte) (n int, err error) {
 	}
 	d.step.Log = d.step.Log + string(p)
 	return len(p), nil
+}
+
+func waitForSecret(kubectl *kubernetes.Clientset, name, namespace string) bool {
+	counter := 0
+	for {
+		sd, err := kubectl.CoreV1().Secrets(namespace).Get(name, meta_v1.GetOptions{})
+		if err != nil {
+			log.Printf("was unable to get %v in %v\n", name, namespace)
+		}
+		if sd.Name == name {
+			return true
+		}
+		time.Sleep(1 * time.Second)
+		counter++
+		if counter == 120 {
+			return false
+		}
+	}
+}
+
+func waitForNamespace(kubectl *kubernetes.Clientset, name string) bool {
+	counter := 0
+	for {
+		ns, err := kubectl.CoreV1().Namespaces().Get(name, meta_v1.GetOptions{})
+		if err != nil {
+			log.Printf("was unable to get namespace %v\n", name)
+		}
+		if ns.Name == name {
+			return true
+		}
+		time.Sleep(1 * time.Second)
+		counter++
+		if counter == 120 {
+			return false
+		}
+
+	}
 }

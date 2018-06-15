@@ -4,7 +4,6 @@ import (
 	"log"
 
 	"github.com/pkg/errors"
-	"gitlab.com/sorenmat/seneferu/builder"
 	"gitlab.com/sorenmat/seneferu/storage/sql"
 	"gitlab.com/sorenmat/seneferu/web"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -49,11 +48,6 @@ func main() {
 		log.Fatal(errors.Wrap(err, "unable create kubectl"))
 	}
 
-	err = builder.CreateSSHKeySecret(kubectl, *sshkey)
-	if err != nil {
-		log.Fatal("Unable to create secret 'sshkey': ", err)
-	}
-
 	log.Println("Starting web server...")
-	web.StartWebServer(service, kubectl, *githubSecret, *targetURL, *githubToken, *dockerRegHost)
+	web.StartWebServer(service, kubectl, *githubSecret, *targetURL, *githubToken, *dockerRegHost, *sshkey)
 }
