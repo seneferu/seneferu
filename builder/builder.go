@@ -122,6 +122,8 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 	// add container to the pod
 	cfg, err := getConfigfile(build, token)
 	if err != nil {
+		github.ReportBack(github.GithubStatus{State: "error", Context: "fetching or parsing .ci.yaml"}, build.StatusURL, build.Commit, token)
+
 		return errors.Wrap(err, "unable to handle buildconfig file")
 	}
 	ns := &v1.Namespace{}
@@ -132,6 +134,7 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 		return errors.Wrapf(err, "Error creating namespace %v: %v", ns, err)
 	}
 	waitForNamespace(kubectl, ns.Name)
+	defer cleanupNamespace(kubectl, ns.Name)
 
 	err = CreateSSHKeySecret(kubectl, sshkey, ns.Name)
 	if err != nil {
@@ -164,13 +167,6 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 	pod.Spec.Containers = append(pod.Spec.Containers, services...)
 	pod.Spec.Containers = append(pod.Spec.Containers, buildSteps...)
 
-	for _, v := range buildSteps {
-		err := github.ReportBack(github.GithubStatus{State: "pending", Context: v.Name}, build.StatusURL, build.Commit, token)
-		if err != nil {
-			log.Println("unable to report status back to github")
-		}
-	}
-
 	pod.Namespace = ns.Name
 	_, err = kubectl.CoreV1().Pods(ns.Name).Create(pod)
 	if err != nil {
@@ -179,12 +175,32 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 	build.Status = "Started"
 	err = service.SaveBuild(build)
 	if err != nil {
-		return errors.Wrap(err, "Error while waiting for container ")
+		return errors.Wrap(err, "unable to save build")
+	}
+	for _, v := range buildSteps {
+		err := github.ReportBack(github.GithubStatus{State: "pending", Context: v.Name}, build.StatusURL, build.Commit, token)
+		if err != nil {
+			log.Println("unable to report status back to github")
+		}
 	}
 
 	// replace above sleep with a polling of the container ready state
 	// perhaps replace with a listen hook
-	waitForContainer(kubectl, buildUUID, ns.Name)
+	err = waitForContainer(kubectl, buildUUID, ns.Name)
+	if err != nil {
+		for _, v := range buildSteps {
+			err := github.ReportBack(github.GithubStatus{State: "error", Context: v.Name}, build.StatusURL, build.Commit, token)
+			if err != nil {
+				log.Println("unable to report status back to github")
+			}
+		}
+
+		gerr := github.ReportBack(github.GithubStatus{State: "error", Context: "build failed to start"}, build.StatusURL, build.Commit, token)
+		if gerr != nil {
+			log.Println("unable to report status back to github about build unable to start")
+		}
+		return err
+	}
 	build.Status = "Running"
 	err = service.SaveBuild(build)
 	if err != nil {
@@ -282,19 +298,16 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 		return errors.Wrap(err, fmt.Sprintf("unable to save build %v", build))
 	}
 
-	// clean up
+	return nil
+}
 
-	err = kubectl.CoreV1().Namespaces().Delete(ns.Name, &meta_v1.DeleteOptions{})
+func cleanupNamespace(kubectl *kubernetes.Clientset, namespace string) {
+	log.Printf("clean up of namespace %v started", namespace)
+	err := kubectl.CoreV1().Namespaces().Delete(namespace, &meta_v1.DeleteOptions{})
 	if err != nil {
 		log.Println("Error while deleing namespace: ", err)
-		return errors.Wrap(err, "Error while deleing namespace")
 	}
-
-	log.Println("Namespace deleted!")
-	log.Println("*****************************************")
-	log.Println("Declaring build done")
-	log.Println("*****************************************")
-	return nil
+	log.Printf("Namespace %v deleted!", namespace)
 }
 
 // generateScript is a helper function that generates a build script and base64 encode it.
@@ -575,6 +588,13 @@ func waitForContainerTermination(kubectl *kubernetes.Clientset, b v1.Container, 
 		if err != nil {
 			return -1, errors.Wrap(err, "unable to get pod, while waiting for it")
 		}
+		reason, err := printPod(pod)
+		if err != nil {
+			log.Println("print pod error", err)
+		} else {
+			log.Println("REASON: ", reason)
+		}
+
 		for _, v := range pod.Status.ContainerStatuses {
 			if v.Name == b.Name {
 				if v.State.Terminated != nil && v.State.Terminated.Reason != "" {
@@ -619,6 +639,21 @@ func waitForContainer(kubectl *kubernetes.Clientset, buildname string, namespace
 		if err != nil {
 			return errors.Wrap(err, "unable to get pod, while waiting for it")
 		}
+		reason, err := printPod(pod)
+		if err != nil {
+			log.Println("print pod error", err)
+			return err
+		}
+		if reason == "Init:Error" {
+			return fmt.Errorf(reason)
+		}
+		if reason == "Running" {
+			return nil
+		}
+		if reason == "Failed" {
+			return fmt.Errorf(reason)
+		}
+		log.Println("unknown reason state", reason)
 		if pod.Status.Phase == "Running" || pod.Status.Phase == "Succeeded" || pod.Status.Phase == "Failed" {
 			return nil
 		}
@@ -695,4 +730,78 @@ func waitForNamespace(kubectl *kubernetes.Clientset, name string) bool {
 		}
 
 	}
+}
+
+func printPod(pod *v1.Pod) (string, error) {
+	restarts := 0
+	readyContainers := 0
+
+	reason := string(pod.Status.Phase)
+	if pod.Status.Reason != "" {
+		reason = pod.Status.Reason
+	}
+
+	initializing := false
+
+	for i := range pod.Status.InitContainerStatuses {
+		container := pod.Status.InitContainerStatuses[i]
+		restarts += int(container.RestartCount)
+		switch {
+		case container.State.Terminated != nil && container.State.Terminated.ExitCode == 0:
+			continue
+		case container.State.Terminated != nil:
+			// initialization is failed
+			if len(container.State.Terminated.Reason) == 0 {
+				if container.State.Terminated.Signal != 0 {
+					reason = fmt.Sprintf("Init:Signal:%d", container.State.Terminated.Signal)
+				} else {
+					reason = fmt.Sprintf("Init:ExitCode:%d", container.State.Terminated.ExitCode)
+				}
+			} else {
+				reason = "Init:" + container.State.Terminated.Reason
+			}
+			initializing = true
+		case container.State.Waiting != nil && len(container.State.Waiting.Reason) > 0 && container.State.Waiting.Reason != "PodInitializing":
+			reason = "Init:" + container.State.Waiting.Reason
+			initializing = true
+		default:
+			reason = fmt.Sprintf("Init:%d/%d", i, len(pod.Spec.InitContainers))
+			initializing = true
+		}
+		break
+	}
+
+	if !initializing {
+		restarts = 0
+		hasRunning := false
+		for i := len(pod.Status.ContainerStatuses) - 1; i >= 0; i-- {
+			container := pod.Status.ContainerStatuses[i]
+
+			restarts += int(container.RestartCount)
+			if container.State.Waiting != nil && container.State.Waiting.Reason != "" {
+				reason = container.State.Waiting.Reason
+			} else if container.State.Terminated != nil && container.State.Terminated.Reason != "" {
+				reason = container.State.Terminated.Reason
+			} else if container.State.Terminated != nil && container.State.Terminated.Reason == "" {
+				if container.State.Terminated.Signal != 0 {
+					reason = fmt.Sprintf("Signal:%d", container.State.Terminated.Signal)
+				} else {
+					reason = fmt.Sprintf("ExitCode:%d", container.State.Terminated.ExitCode)
+				}
+			} else if container.Ready && container.State.Running != nil {
+				hasRunning = true
+				readyContainers++
+			}
+		}
+
+		// change pod status back to "Running" if there is at least one container still reporting as "Running" status
+		if reason == "Completed" && hasRunning {
+			reason = "Running"
+		}
+	}
+	if pod.DeletionTimestamp != nil {
+		reason = "Terminating"
+	}
+
+	return reason, nil
 }
