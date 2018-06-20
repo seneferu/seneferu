@@ -128,6 +128,7 @@ func ExecuteBuild(kubectl *kubernetes.Clientset, service storage.Service, build 
 	}
 	ns := &v1.Namespace{}
 	ns.Name = pod.Name
+	ns.Annotations = map[string]string{"type": "build", "managedby": "seneferu"}
 	ns.Namespace = pod.Name
 	_, err = kubectl.CoreV1().Namespaces().Create(ns)
 	if err != nil {
@@ -342,7 +343,8 @@ func getConfigfile(build *model.Build, token string) (*yaml.Config, error) {
 
 func doneCmd(count int) string {
 	doneStr := fmt.Sprintf("build%v", count)
-	doneCmd := "touch " + shareddir + "/" + doneStr + ".done"
+	touchStr := "touch " + shareddir + "/" + doneStr + ".done;"
+	doneCmd := `clean() { rc=$?; ` + touchStr + ` exit $rc; }; trap clean EXIT`
 	return doneCmd
 }
 
@@ -387,11 +389,12 @@ func createBuildSteps(build *model.Build, cfg *yaml.Config) ([]v1.Container, err
 		}
 		workspace = shareddir + "/" + workspace
 
+		doneCmd := doneCmd(count)
+		cmds = append(cmds, doneCmd)
+
 		for _, v := range cont.Commands {
 			cmds = append(cmds, v)
 		}
-		doneCmd := doneCmd(count)
-		cmds = append(cmds, doneCmd)
 
 		// Set environment variables
 		var buildEnv []v1.EnvVar
@@ -591,9 +594,8 @@ func waitForContainerTermination(kubectl *kubernetes.Clientset, b v1.Container, 
 		reason, err := printPod(pod)
 		if err != nil {
 			log.Println("print pod error", err)
-		} else {
-			log.Println("REASON: ", reason)
 		}
+		log.Println("REASON: ", reason)
 
 		for _, v := range pod.Status.ContainerStatuses {
 			if v.Name == b.Name {
