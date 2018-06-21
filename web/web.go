@@ -38,7 +38,6 @@ func HandlePullRequest(service storage.Service, kubectl *kubernetes.Clientset, t
 		log.Println("Handling Push Request")
 
 		pl := payload.(github.PullRequestPayload)
-		fmt.Println(pl)
 
 		repo, err := service.LoadByOrgAndName(pl.Repository.Owner.Login, pl.Repository.Name)
 		if err != nil {
