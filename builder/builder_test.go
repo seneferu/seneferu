@@ -3,10 +3,10 @@ package builder
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"strings"
 	"testing"
-
-	"fmt"
 
 	"github.com/sorenmat/pipeline/pipeline/frontend/yaml"
 	"github.com/stretchr/testify/assert"
@@ -37,11 +37,11 @@ func TestDoneCmd(t *testing.T) {
 
 func TestCreateBuild(t *testing.T) {
 	build := &model.Build{Number: 1, Name: "sorenmat", Org: "ci-server"}
-	container := &yaml.Container{Environment: map[string]string{"Name": "sorenmat"}}
-	cfg := &yaml.Config{}
+	container := &Container{Environment: map[string]string{"Name": "sorenmat"}}
+	cfg := &Config{}
 	cfg.Pipeline.Containers = append(cfg.Pipeline.Containers, container)
 
-	steps, err := createBuildSteps(build, cfg)
+	steps, err := createBuildSteps(build, cfg, "")
 	if err != nil {
 		t.Error("createBuildStep should not have failed")
 	}
@@ -62,8 +62,8 @@ func TestCreateBuild(t *testing.T) {
 func TestCoverage(t *testing.T) {
 	str := `coverage: (\d+?.?\d+\%)`
 
-	container := &yaml.Container{Environment: map[string]string{"Name": "sorenmat"}, Coverage: str}
-	cfg := &yaml.Config{}
+	container := &Container{Environment: map[string]string{"Name": "sorenmat"}, Coverage: str}
+	cfg := &Config{}
 	cfg.Pipeline.Containers = append(cfg.Pipeline.Containers, container)
 
 	build := &model.Build{
@@ -139,22 +139,22 @@ func TestBranchMatchExclude(t *testing.T) {
 }
 
 func TestBuildPipeline(t *testing.T) {
-	c := yaml.Config{Pipeline: yaml.Containers{Containers: []*yaml.Container{
-		&yaml.Container{
+	c := Config{Pipeline: Containers{Containers: []*Container{
+		&Container{
 			Name: "MyStep",
 			Constraints: yaml.Constraints{
 				Branch: yaml.Constraint{
 					Include: []string{"master"},
 				},
 			},
-		}, &yaml.Container{
+		}, &Container{
 			Name: "My Production Step",
 			Constraints: yaml.Constraints{
 				Branch: yaml.Constraint{
 					Include: []string{"production"},
 				},
 			},
-		}, &yaml.Container{
+		}, &Container{
 			Name: "My Excluded Production Step",
 			Constraints: yaml.Constraints{
 				Branch: yaml.Constraint{
@@ -164,7 +164,7 @@ func TestBuildPipeline(t *testing.T) {
 		},
 	}}}
 	build := model.Build{Ref: "refs/heads/master"}
-	containers, err := createBuildSteps(&build, &c)
+	containers, err := createBuildSteps(&build, &c, "")
 	assert.NoError(t, err)
 	assert.NotNil(t, containers)
 	assert.Equal(t, 2, len(containers))
@@ -173,15 +173,57 @@ func TestBuildPipeline(t *testing.T) {
 }
 
 func TestEmptyBuildPipeline(t *testing.T) {
-	c := yaml.Config{Pipeline: yaml.Containers{Containers: []*yaml.Container{
-		&yaml.Container{
+	c := Config{Pipeline: Containers{Containers: []*Container{
+		&Container{
 			Name: "MyStep",
 		},
 	}}}
 	build := model.Build{Ref: "refs/heads/master"}
-	containers, err := createBuildSteps(&build, &c)
+	containers, err := createBuildSteps(&build, &c, "")
 	assert.NoError(t, err)
 	assert.NotNil(t, containers)
 	assert.Equal(t, 1, len(containers))
 	assert.Equal(t, "MyStep", containers[0].Name)
+}
+
+func TestYAMLFile(t *testing.T) {
+	data, err := ioutil.ReadFile("ci.yaml")
+	assert.NoError(t, err)
+	c, err := yamlToConfig(data)
+	assert.NoError(t, err)
+	assert.Equal(t, 3, len(c.Pipeline.Containers))
+}
+
+func TestYAMLFileWithBranch(t *testing.T) {
+	data, err := ioutil.ReadFile("ci.yaml")
+	assert.NoError(t, err)
+	c, err := yamlToConfig(data)
+	assert.NoError(t, err)
+	assert.Equal(t, 3, len(c.Pipeline.Containers))
+	assert.Equal(t, 2, len(c.Pipeline.Containers[2].Constraints.Branch.Include))
+}
+
+func TestBranchesFromYAMLFile(t *testing.T) {
+	data, err := ioutil.ReadFile("ci.yaml")
+	assert.NoError(t, err)
+	c, err := yamlToConfig(data)
+
+	build := model.Build{Ref: "refs/heads/master"}
+	containers, err := createBuildSteps(&build, c, "")
+	assert.NoError(t, err)
+	assert.NotNil(t, containers)
+	assert.Equal(t, 3, len(containers))
+	// branch not matching
+	build = model.Build{Ref: "refs/heads/mysuperbranch"}
+	containers, err = createBuildSteps(&build, c, "")
+	assert.NoError(t, err)
+	assert.NotNil(t, containers)
+	assert.Equal(t, 2, len(containers))
+	// mathcing tags
+	build = model.Build{Ref: "refs/tags/v1.0"}
+	containers, err = createBuildSteps(&build, c, "")
+	assert.NoError(t, err)
+	assert.NotNil(t, containers)
+	assert.Equal(t, 3, len(containers))
+
 }

@@ -21,8 +21,6 @@ func isRegex(v interface{}) bool {
 	return strings.HasPrefix(s, `/`) && strings.HasSuffix(s, `/`)
 }
 
-// Value wraps any kind of data and provides helpers
-// for inspecting it.
 type Value struct {
 	Data interface{}
 }
@@ -58,7 +56,6 @@ func (v Value) Equal(val interface{}) bool {
 	return fmt.Sprintf("%v", v.Data) == fmt.Sprintf("%v", val)
 }
 
-// Type gets a string describing the type of this Value.
 func (v Value) Type() string {
 	var str string
 	var ok bool
@@ -71,8 +68,6 @@ func (v Value) Type() string {
 	return "string"
 }
 
-// ParseValue parses the specified bytes into a Value
-// using the encoding/json unmarshaller.
 func ParseValue(src []byte) *Value {
 	var v interface{}
 	src = clean(src)

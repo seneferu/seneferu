@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo"
+	"github.com/labstack/echo/middleware"
 	"gitlab.com/sorenmat/seneferu/builder"
 	"gitlab.com/sorenmat/seneferu/model"
 	"gitlab.com/sorenmat/seneferu/storage"
@@ -16,7 +17,6 @@ import (
 	"gopkg.in/go-playground/webhooks.v3"
 	"gopkg.in/go-playground/webhooks.v3/github"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/helm/pkg/helm"
 )
 
 // HandleRelease handles GitHub release events
@@ -35,8 +35,6 @@ func HandleRelease(payload interface{}, header webhooks.Header) {
 func HandlePullRequest(service storage.Service, kubectl *kubernetes.Clientset, token string, targetURL string, dockerRegHost string, sshkey string) webhooks.ProcessPayloadFunc {
 	log.Println("Handling Pull Request right now")
 	return func(payload interface{}, header webhooks.Header) {
-		log.Println("Handling Push Request")
-
 		pl := payload.(github.PullRequestPayload)
 
 		repo, err := service.LoadByOrgAndName(pl.Repository.Owner.Login, pl.Repository.Name)
@@ -138,12 +136,16 @@ func StartWebServer(db storage.Service, kubectl *kubernetes.Clientset, secret st
 	hook.RegisterEvents(HandlePush(db, kubectl, token, targetURL, dockerRegHost, sshkey), github.PushEvent)
 
 	e := echo.New()
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{echo.GET, echo.PUT, echo.POST, echo.DELETE},
+	}))
+	e.Use(middleware.Logger())
 
-	e.Static("/styles", "styles")
-	e.Static("/js", "js")
-	e.Static("/images", "images")
+	e.Static("/static", "static")
 	e.File("/", "index.html")
 	e.GET("/status", handleStatus())
+	e.GET("/builds", handleFetchAllBuilds(db))
 	e.GET("/repos", handleFetchRepos(db))
 	e.GET("/repo/:org/:id", handleFetchRepoData(db))
 	e.GET("/repo/:org/:id/builds", handleFetchBuilds(db))
@@ -249,35 +251,6 @@ func handleFetchRepoData(db storage.Service) echo.HandlerFunc {
 	}
 }
 
-func handleHelm(host string) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		release := c.Param("release")
-		if release == "" {
-			return fmt.Errorf("release can't be empty")
-		}
-		client := helm.NewClient(helm.Host(host))
-
-		_, err := client.GetVersion()
-		if err != nil {
-			return err
-		}
-
-		list, err := client.ReleaseHistory(release, helm.WithMaxHistory(10))
-		if err != nil {
-			return err
-		}
-
-		var deployments []model.Deployment
-		for _, v := range list.GetReleases() {
-			d := model.Deployment{Version: strconv.Itoa(int(v.Version)), Name: v.Name, Status: v.GetInfo().GetStatus().Code.String(), Description: v.GetInfo().GetDescription()}
-			deployments = append(deployments, d)
-		}
-		c.JSON(200, deployments)
-
-		return nil
-	}
-}
-
 func handleFetchBuild(db storage.Service) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		org := c.Param("org")
@@ -323,6 +296,22 @@ func handleFetchStep(db storage.Service) echo.HandlerFunc {
 func handleFetchRepos(db storage.Service) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		repos, err := db.All()
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+		return c.JSON(200, repos)
+	}
+}
+
+func handleFetchAllBuilds(db storage.Service) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		max := 0
+		maxStr := c.QueryParam("max")
+		if maxStr != "" {
+			max, _ = strconv.Atoi(maxStr)
+		}
+		repos, err := db.LoadAllBuilds(max)
 		if err != nil {
 			log.Println(err)
 			return err

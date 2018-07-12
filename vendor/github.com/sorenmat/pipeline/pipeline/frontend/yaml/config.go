@@ -12,7 +12,6 @@ import (
 type (
 	// Config defines a pipeline configuration.
 	Config struct {
-		Cache     libcompose.Stringorslice
 		Platform  string
 		Branches  Constraint
 		Workspace Workspace

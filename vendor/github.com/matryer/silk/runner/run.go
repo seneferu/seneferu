@@ -53,7 +53,7 @@ func New(t T, URL string) *Runner {
 		t:         t,
 		rootURL:   URL,
 		vars:      make(map[string]*parse.Value),
-		DoRequest: http.DefaultTransport.RoundTrip,
+		DoRequest: http.DefaultClient.Do,
 		Log: func(s string) {
 			fmt.Println(s)
 		},
