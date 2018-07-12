@@ -163,6 +163,12 @@
 			"revisionTime": "2017-06-06T14:27:51Z"
 		},
 		{
+			"checksumSHA1": "EK2VP/7bE/h7Lnutma8UHWkOJsQ=",
+			"path": "github.com/go-yaml/yaml",
+			"revision": "5420a8b6744d3b0345ab293f6fcba19c978f1183",
+			"revisionTime": "2018-03-28T19:50:20Z"
+		},
+		{
 			"checksumSHA1": "/RE0VzeaXdaBUNeNMUXWqzly7qY=",
 			"origin": "k8s.io/helm/vendor/github.com/gobwas/glob",
 			"path": "github.com/gobwas/glob",
@@ -320,6 +326,36 @@
 			"path": "github.com/gregjones/httpcache/diskcache",
 			"revision": "82aa063804cf055e16e8911250f888bc216e8b61",
 			"revisionTime": "2017-09-21T16:56:50Z"
+		},
+		{
+			"checksumSHA1": "k/jX37/+ohpz3qC0AbMqHwL+F6M=",
+			"path": "github.com/heetch/confita",
+			"revision": "b2c3464fd4b6a7fa45af979ece87092d86ddd69f",
+			"revisionTime": "2018-06-28T15:43:50Z"
+		},
+		{
+			"checksumSHA1": "0qkdibQ6dzQrjDisyAeoFDxrrqw=",
+			"path": "github.com/heetch/confita/backend",
+			"revision": "b2c3464fd4b6a7fa45af979ece87092d86ddd69f",
+			"revisionTime": "2018-06-28T15:43:50Z"
+		},
+		{
+			"checksumSHA1": "6d8liz0KywSjNsjgeRhTEYBklxc=",
+			"path": "github.com/heetch/confita/backend/env",
+			"revision": "b2c3464fd4b6a7fa45af979ece87092d86ddd69f",
+			"revisionTime": "2018-06-28T15:43:50Z"
+		},
+		{
+			"checksumSHA1": "Plq0l10ryAri7Mi2WkyiFDvO28Y=",
+			"path": "github.com/heetch/confita/backend/file",
+			"revision": "b2c3464fd4b6a7fa45af979ece87092d86ddd69f",
+			"revisionTime": "2018-06-28T15:43:50Z"
+		},
+		{
+			"checksumSHA1": "2BIPX8cr+wSAj4ZqWqb/6xyo05U=",
+			"path": "github.com/heetch/confita/backend/flags",
+			"revision": "b2c3464fd4b6a7fa45af979ece87092d86ddd69f",
+			"revisionTime": "2018-06-28T15:43:50Z"
 		},
 		{
 			"checksumSHA1": "K6exl2ouL7d8cR2i378EzZOdRVI=",
